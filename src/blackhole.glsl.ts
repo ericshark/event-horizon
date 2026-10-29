@@ -104,7 +104,6 @@ vec3 sky(vec3 dir) {
   vec3 nebula = mix(vec3(0.05, 0.02, 0.10), vec3(0.02, 0.08, 0.13), n);
   nebula += vec3(0.20, 0.06, 0.12) * pow(wisps, 3.0) * band;
   col += nebula * (0.35 + 0.65 * band) * 0.55;
-  col += vec3(1.0, 0.91, 0.72) * 3.0 * exp(-pow(length(dir - normalize(vec3(0.42, 0.13, -1.0))) * 110.0, 2.0));
   return col;
 }
 
@@ -153,8 +152,8 @@ void main() {
 
   vec3 col = vec3(0.0);
   float trans = 1.0;
-
-
+  float glow = 0.0;
+  float ringGlow = 0.0;
   bool captured = false;
   // Blue noise would be nicer, but a hashed start offset hides the step banding.
   float jitter = hash13(vec3(gl_FragCoord.xy, fract(uTime) * 61.0));
@@ -180,12 +179,24 @@ void main() {
       break;
     }
 
+    if (prev.y * pos.y < 0.0) {
+      vec3 hit = mix(prev, pos, prev.y / (prev.y - pos.y));
+      vec4 d = diskSample(hit, normalize(vel));
+      col += trans * d.rgb * d.a;
+      trans *= 1.0 - d.a;
+    }
+
+    // Thin volumetric haze hugging the disk, plus the photon ring's halo.
+    float diskBand = smoothstep(DISK_IN - 0.4, DISK_IN + 1.0, rNew) * smoothstep(DISK_OUT + 2.0, DISK_IN + 2.0, rNew);
+    glow += exp(-abs(pos.y) * 5.0) * diskBand * dt * 0.018 / max(rNew - 1.0, 0.3);
+    ringGlow += exp(-pow((rNew - 1.5) * 7.0, 2.0)) * dt * 0.05;
+
     if (trans < 0.01) break;
     if (rNew > ESCAPE_R && dot(pos, vel) > 0.0) break;
   }
 
-  if (!captured) col += trans * sky(normalize(vel));
-
+  if (!captured) col += trans * sky(normalize(vel)) + ringGlow * vec3(1.0, 0.7, 0.42);
+  col += glow * vec3(1.0, 0.45, 0.16);
 
   col = aces(col * 1.1);
   col = pow(col, vec3(0.92));
@@ -193,8 +204,8 @@ void main() {
   vec2 vig = vUv - 0.5;
   col *= 1.0 - dot(vig, vig) * 0.9;
 
-  col = mix(col, vec3(1.0, 0.985, 0.96), uWhiteout);
-  col = mix(col, vec3(1.0) - col, uInvert);
+
+
 
   gl_FragColor = vec4(col, 1.0);
 }

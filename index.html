@@ -19,60 +19,117 @@
     <div id="fallback" aria-hidden="true">
       <div class="fallback-body"></div>
     </div>
-    <div class="blackhole-target" aria-hidden="true">
-      <i></i><span>GAIA BH1 · DORMANT</span>
-    </div>
     <div class="vignette" aria-hidden="true"></div>
     <header class="masthead">
       <a href="#earth" class="brand"
-        ><span class="brand-orbit" aria-hidden="true"></span> EVENT HORIZON
-        <small>A FIELD GUIDE TO DISTANCE</small></a
+        ><span class="brand-orbit" aria-hidden="true"></span>EVENT HORIZON
+        <small>A JOURNEY THROUGH DISTANCE</small></a
       >
-      <div class="navigation">
-        <label class="checkpoint-picker"
+      <nav aria-label="Journey controls">
+        <label
           >Jump to
           <select
             id="checkpoints"
             aria-label="Choose a checkpoint"
           ></select></label
-        ><button id="sources-open" type="button">
-          Sources &amp; method <span aria-hidden="true">＋</span>
+        ><button id="sources-open" type="button">Sources</button>
+      </nav>
+    </header>
+    <main
+      id="journey"
+      aria-label="Scroll through the 21-checkpoint tour"
+    ></main>
+    <aside
+      class="flight-panel"
+      aria-label="Current location and flight information"
+    >
+      <p id="phase" class="eyebrow">NOW / EARTH ORBIT</p>
+      <h1 id="location">Earth</h1>
+      <div class="next-line">
+        <span id="next-label">NEXT / MOON</span
+        ><span id="checkpoint-count">01 / 21</span>
+      </div>
+      <p id="description"></p>
+      <div class="readouts" aria-label="Primary journey metrics">
+        <div>
+          <span id="range-label">ALTITUDE ABOVE EARTH</span
+          ><strong id="range-value">20,000 km</strong>
+        </div>
+        <div>
+          <span>TOUR DISTANCE TRAVELLED</span
+          ><strong id="route-value">0 km</strong>
+        </div>
+        <div>
+          <span>LIGHT-EQUIVALENT TIME</span
+          ><strong id="time-value">0 seconds</strong>
+        </div>
+      </div>
+      <div class="panel-actions">
+        <a id="begin" href="#moon"
+          >Begin the journey <span aria-hidden="true">↗</span></a
+        ><button id="details-open" type="button">
+          Details <span aria-hidden="true">＋</span>
         </button>
       </div>
-    </header>
-    <div class="mission-meta">
-      <span><i></i> EARTH → GAIA BH1</span
-      ><span>21 CHECKPOINTS · A CURATED TOUR</span>
+      <p id="cinematic-note" hidden>
+        Cinematic accretion disk · Gaia BH1 is dormant.
+      </p>
+    </aside>
+    <div id="destination-marker" aria-hidden="true">
+      <i></i><span id="destination-name"></span>
     </div>
-    <main id="journey"></main>
-    <nav class="rail" aria-label="Journey checkpoints" id="rail"></nav>
-    <footer class="flight-deck" aria-label="Journey telemetry">
-      <div>
-        <span>DISTANCE TO EARTH’S CENTRE</span
-        ><strong id="earth-distance">26,371 km</strong
-        ><small id="earth-miles"></small>
+    <section id="ending" hidden aria-label="Journey summary">
+      <p class="eyebrow">BEYOND THE LAST RETURN SIGNAL</p>
+      <h2>Journey complete.</h2>
+      <p id="final-stats"></p>
+      <blockquote>
+        “We can measure the distance. We are still learning what lies beyond.”
+      </blockquote>
+      <p class="ending-caption">
+        A theoretical interior. No physical return is possible.
+      </p>
+      <a href="#earth">Return to Earth ↑</a>
+    </section>
+    <nav
+      id="rail"
+      class="distance-rail"
+      aria-label="Distance-scaled journey timeline"
+    >
+      <div class="rail-heading">
+        <span>TOUR DISTANCE</span><span id="axis-domain"></span>
       </div>
-      <div>
-        <span>TOUR DISTANCE TRAVELLED</span
-        ><strong id="route-distance">0 km</strong
-        ><small id="compression"></small>
+      <div id="axis-track">
+        <div id="axis-travel"></div>
+        <div id="axis-head"></div>
+        <div id="axis-markers"></div>
       </div>
-      <div>
-        <span>LIGHT-EQUIVALENT TIME / 1c</span
-        ><strong id="light-time">0 seconds</strong
-        ><small>1c comparison · not a human flight</small>
+      <div id="axis-ticks"></div>
+    </nav>
+    <dialog id="details" aria-labelledby="details-title">
+      <div class="dialog-top">
+        <p class="eyebrow">FIELD NOTES</p>
+        <button id="details-close" type="button" aria-label="Close details">
+          Close ×
+        </button>
       </div>
-      <div>
-        <span>AT PARKER’S RECORD SPEED</span
-        ><strong id="parker-time">0 seconds</strong
-        ><small>430,000 mph held constant · illustrative</small>
+      <h2 id="details-title">Earth</h2>
+      <div id="details-content"></div>
+    </dialog>
+    <dialog id="cluster" aria-labelledby="cluster-title">
+      <div class="dialog-top">
+        <p class="eyebrow">DISTANCES IN CONTEXT</p>
+        <button
+          id="cluster-close"
+          type="button"
+          aria-label="Close checkpoint group"
+        >
+          Close ×
+        </button>
       </div>
-      <div class="remaining">
-        <span>REMAINING TOUR DISTANCE</span
-        ><strong id="remaining-distance"></strong
-        ><small>Includes educational detours</small>
-      </div>
-    </footer>
+      <h2 id="cluster-title">Nearby checkpoints</h2>
+      <div id="cluster-inset" aria-label="Local linear distance scale"></div>
+      <ol id="cluster-list"></ol>
+    </dialog>
     <dialog id="sources" aria-labelledby="sources-title">
       <div class="dialog-top">
         <p class="eyebrow">THE SCIENCE BEHIND THE JOURNEY</p>
@@ -80,9 +137,7 @@
           Close ×
         </button>
       </div>
-      <h2 id="sources-title">
-        A map of what we know.<br />A little room for wonder.
-      </h2>
+      <h2 id="sources-title">Sources &amp; methodology</h2>
       <p>
         This is a guided illustration, not a mission trajectory. Object sizes,
         spacing, rotation and transit time are rescaled for readability. Full
@@ -134,10 +189,12 @@
           estimate 2GMh/r³ across h = 2 metres, in m/s²; it is educational, not
           a biological survival prediction or an exact relativistic calculation.
           The camera continues after destructive tides as an imaginary observer.
-          A dormant black hole has no luminous accretion disk. The companion and
-          star field are illustrative. Inside, no signal or physical return to
-          Earth is possible; our final overlay is a narrative interface, not
-          transmitted telemetry.
+          Gaia BH1 is dormant. The luminous accretion disk restored in this
+          experience is a cinematic illustration of an active black hole, not an
+          observation of Gaia BH1. The companion and star field are
+          illustrative. Inside, no signal or physical return to Earth is
+          possible; our final overlay is a narrative interface, not transmitted
+          telemetry.
         </p>
         <a
           href="https://www.esa.int/Science_Exploration/Space_Science/Gaia/Gaia_discovers_a_new_family_of_black_holes"
@@ -190,8 +247,11 @@
           <a href="/textures/credits.json" target="_blank" rel="noreferrer"
             >the texture credits</a
           >. Mercury, Uranus, stars, spacecraft geometry, rings and distant
-          populations are illustrative materials or geometry. No live Google
-          Earth, cloud, weather or terrain services are used.
+          populations are illustrative materials or geometry. The Hipparcos
+          catalogue map supplies the distant sky. Warp streaks visualize
+          compressed travel, not a relativistic view. Distant targets have
+          enhanced minimum visibility. No live Google Earth, cloud, weather or
+          terrain services are used.
         </p>
         <a
           href="https://github.com/nasa/NASA-3D-Resources"
@@ -201,7 +261,7 @@
         >
       </details>
     </dialog>
-    <div class="render-status" role="status" id="render-status"></div>
+    <p id="render-status" class="render-status" role="status"></p>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
