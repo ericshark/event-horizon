@@ -1259,3 +1259,18 @@ h2 {
 .is-ready .loader {
   display: none;
 }
+
+.is-overview .hud,
+.is-overview .gauge,
+.is-overview .reticle {
+  opacity: 0;
+  pointer-events: none;
+}
+.is-overview .hud a {
+  pointer-events: none;
+}
+@media (max-width: 700px) {
+  .mission-intro {
+    background: #030304e8;
+  }
+}

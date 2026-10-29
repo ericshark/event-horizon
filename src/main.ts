@@ -164,6 +164,10 @@ function tick() {
   state.lastTime = now;
   if (!state.running) return;
 
+  root.classList.toggle(
+    'is-overview',
+    sections[0].getBoundingClientRect().top > window.innerHeight * 0.3,
+  );
   const scroll = readScroll();
   const follow = reduceMotion ? 1 : 1 - Math.exp(-dt * 6);
   state.progress += (scroll.progress - state.progress) * follow;
