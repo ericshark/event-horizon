@@ -47,9 +47,7 @@ port if 5174 is busy.
 - `src/main.ts`: Lenis smooth scroll, HUD physics readouts, pointer lens,
   and the finale.
 
-Rendering pauses while the tab is hidden. With `prefers-reduced-motion`,
-smooth scrolling, letter stretching, and camera sway are off, and the disk
-spins slowly; scrolling still drives the descent. Without WebGL2 a CSS
+Rendering pauses while the tab is hidden. Full visual motion is always enabled. Without WebGL2 a CSS
 illustration and the regular title are shown instead. Fonts are bundled
 locally and the page makes no network requests.
 
@@ -65,3 +63,13 @@ Tests start their own server on port 5201 (`PW_PORT` overrides it), run at
 desktop 1440 × 1000 and mobile 390 × 844 in Chromium with SwiftShader WebGL,
 and save screenshots to `artifacts/`. Software rendering is far slower than a
 real GPU, so the governor drops the resolution during tests.
+
+## Landing-page template
+
+The entry page now introduces a fictional brand, explains the experience, and
+links to the original interactive showcase. All visual motion runs independently
+of operating-system reduced-motion settings. Hardware quality tiers and WebGL
+fallbacks remain available. Audio still requires a visitor gesture.
+
+Browser checks use `/usr/bin/chromium` by default; set `CHROMIUM_PATH` to use
+another installed Chromium binary.

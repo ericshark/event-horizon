@@ -35,9 +35,7 @@ test('renders the lensed hero with live telemetry and no errors', async ({
   });
   expect(await screenshotContrast(page, shot)).toBeGreaterThan(12);
   await expect(page.locator('[data-readout="r"]')).toHaveText('30.00');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    /Event\s+Horizon/,
-  );
+  await expect(page.locator('.hero-title')).toHaveText(/Event\s+Horizon/);
   expect(await hasHorizontalOverflow(page)).toBe(false);
   expect(errors).toEqual([]);
 });
@@ -88,21 +86,19 @@ test('the singularity whites out and falling again inverts the universe', async 
   await expect(page.locator('html')).not.toHaveClass(/is-white/);
 });
 
-test('reduced motion keeps the descent but drops smooth scroll and stretching', async ({
+test('full visual motion remains enabled with OS reduced motion', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.locator('html')).toHaveClass(/reduce-motion/);
-  await expect(page.locator('html')).not.toHaveClass(/lenis/);
-  await scrollToChapter(page, 3, 0.9);
-  await expect(page.locator('[data-chapter-name]')).toHaveText('Tides');
-  await expect(page.locator('.stretch__char').first()).toHaveCSS(
-    'transform',
-    'none',
-  );
+  await expect(page.locator('html')).not.toHaveClass(/reduce-motion/);
+  const visual = page.locator('.scroll-cue i').first();
+  expect(
+    await visual.evaluate(
+      (el) => getComputedStyle(el, '::after').animationName,
+    ),
+  ).not.toBe('none');
 });
-
 test('without WebGL a static illustration and readable title remain', async ({
   page,
 }, info) => {
@@ -125,7 +121,7 @@ test('without WebGL a static illustration and readable title remain', async ({
   await page.goto('/');
   await expect(page.locator('html')).toHaveClass(/no-webgl/);
   await expect(page.locator('.fallback')).toBeVisible();
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.locator('.hero-title')).toBeVisible();
   await expect(page.locator('html')).toHaveClass(/is-ready/);
   await expect(page.locator('.loader')).toBeHidden();
   await page.screenshot({

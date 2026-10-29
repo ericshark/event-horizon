@@ -15,6 +15,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     // Headless Chromium has no GPU; SwiftShader provides a software WebGL implementation.
     launchOptions: {
+      executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
       args: [
         '--use-angle=swiftshader',
         '--enable-unsafe-swiftshader',
@@ -36,6 +37,6 @@ export default defineConfig({
   webServer: {
     command: `npx vite --host 127.0.0.1 --port ${port} --strictPort`,
     url: `http://127.0.0.1:${port}`,
-    reuseExistingServer: false,
+    reuseExistingServer: true,
   },
 });

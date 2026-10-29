@@ -21,7 +21,7 @@ const CHAPTERS = [
 const NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
 const root = document.documentElement;
-const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduceMotion = false;
 root.classList.toggle('reduce-motion', reduceMotion);
 
 const $ = <T extends Element = HTMLElement>(selector: string) =>
