@@ -104,6 +104,7 @@ vec3 sky(vec3 dir) {
   vec3 nebula = mix(vec3(0.05, 0.02, 0.10), vec3(0.02, 0.08, 0.13), n);
   nebula += vec3(0.20, 0.06, 0.12) * pow(wisps, 3.0) * band;
   col += nebula * (0.35 + 0.65 * band) * 0.55;
+  col += vec3(1.0, 0.91, 0.72) * 3.0 * exp(-pow(length(dir - normalize(vec3(0.42, 0.13, -1.0))) * 110.0, 2.0));
   return col;
 }
 
@@ -152,15 +153,15 @@ void main() {
 
   vec3 col = vec3(0.0);
   float trans = 1.0;
-  float glow = 0.0;
-  float ringGlow = 0.0;
+
+
   bool captured = false;
   // Blue noise would be nicer, but a hashed start offset hides the step banding.
   float jitter = hash13(vec3(gl_FragCoord.xy, fract(uTime) * 61.0));
 
   for (int i = 0; i < MAX_STEPS; i++) {
     float r = length(pos);
-    float dt = clamp(0.055 * r, 0.012, 1.4) * uStepScale;
+    float dt = clamp(0.055 * r, 0.012, max(1.4, r * 0.08)) * uStepScale;
     if (i == 0) dt *= jitter;
 
     // Exact null-geodesic bending in Cartesian form: a = -1.5 h^2 x / r^5.
@@ -179,35 +180,12 @@ void main() {
       break;
     }
 
-    if (prev.y * pos.y < 0.0) {
-      vec3 hit = mix(prev, pos, prev.y / (prev.y - pos.y));
-      vec4 d = diskSample(hit, normalize(vel));
-      col += trans * d.rgb * d.a;
-      trans *= 1.0 - d.a;
-    }
-
-    if (uTitleOpacity > 0.001 && prev.z > TITLE_Z && pos.z <= TITLE_Z) {
-      vec3 hit = mix(prev, pos, (prev.z - TITLE_Z) / (prev.z - pos.z));
-      vec2 tuv = hit.xy / uTitleSize + 0.5;
-      if (tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0) {
-        vec4 t = texture2D(uTitle, tuv);
-        float a = t.a * uTitleOpacity;
-        col += trans * t.rgb * vec3(1.0, 0.94, 0.86) * a * 1.35;
-        trans *= 1.0 - a * 0.92;
-      }
-    }
-
-    // Thin volumetric haze hugging the disk, plus the photon ring's halo.
-    float diskBand = smoothstep(DISK_IN - 0.4, DISK_IN + 1.0, rNew) * smoothstep(DISK_OUT + 2.0, DISK_IN + 2.0, rNew);
-    glow += exp(-abs(pos.y) * 5.0) * diskBand * dt * 0.018 / max(rNew - 1.0, 0.3);
-    ringGlow += exp(-pow((rNew - 1.5) * 7.0, 2.0)) * dt * 0.05;
-
     if (trans < 0.01) break;
     if (rNew > ESCAPE_R && dot(pos, vel) > 0.0) break;
   }
 
-  if (!captured) col += trans * sky(normalize(vel)) + ringGlow * vec3(1.0, 0.7, 0.42);
-  col += glow * vec3(1.0, 0.45, 0.16);
+  if (!captured) col += trans * sky(normalize(vel));
+
 
   col = aces(col * 1.1);
   col = pow(col, vec3(0.92));

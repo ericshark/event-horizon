@@ -1,131 +1,157 @@
-import { expect, test, type Page } from '@playwright/test';
-import {
-  collectErrors,
-  hasHorizontalOverflow,
-  screenshotContrast,
-} from './helpers';
-
-const framesRendered = (page: Page) =>
-  page.evaluate(() => window.__horizon?.frames() ?? 0);
-
-async function scrollToChapter(page: Page, index: number, local = 0.4) {
+import { test, expect, type Page } from '@playwright/test';
+import { CHECKPOINTS } from '../src/journey';
+async function jump(page: Page, index: number, local = 0.25) {
   await page.evaluate(
-    ([i, l]) => {
-      const section = document.querySelectorAll<HTMLElement>('.chapter')[i];
-      const last = i === document.querySelectorAll('.chapter').length - 1;
-      const span = section.offsetHeight - (last ? innerHeight : 0);
-      window.scrollTo(0, section.offsetTop + span * l);
+    ([i, t]) => {
+      const el = document.querySelectorAll<HTMLElement>('.chapter')[i];
+      window.scrollTo(
+        0,
+        el.offsetTop + (el.offsetHeight - innerHeight * 0.12) * t,
+      );
     },
     [index, local],
   );
+  await expect
+    .poll(() => page.evaluate(() => window.__horizon?.state().index))
+    .toBe(index);
 }
-
-test('renders the lensed hero with live telemetry and no errors', async ({
+test('Earth opens immediately with physical altitude and a live globe', async ({
   page,
 }, info) => {
-  const errors = collectErrors(page);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await expect(page.locator('html')).toHaveClass(/has-webgl/);
-  await expect(page.locator('html')).toHaveClass(/is-ready/);
-  await expect(page.locator('.loader')).toBeHidden();
-  await expect.poll(() => framesRendered(page)).toBeGreaterThan(2);
-
-  const shot = await page.screenshot({
-    path: `artifacts/${info.project.name}-hero.png`,
-  });
-  expect(await screenshotContrast(page, shot)).toBeGreaterThan(12);
-  await expect(page.locator('[data-readout="r"]')).toHaveText('30.00');
-  await expect(page.locator('.hero-title')).toHaveText(/Event\s+Horizon/);
-  expect(await hasHorizontalOverflow(page)).toBe(false);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'How far away is the nearest black hole?',
+  );
+  await expect
+    .poll(() => page.evaluate(() => window.__horizon?.frames()))
+    .toBeGreaterThan(2);
+  await expect(
+    page.locator('#earth [data-metric="Camera surface range"]'),
+  ).toContainText('20,000 km');
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+  ).toBe(false);
+  await page.screenshot({ path: `artifacts/${info.project.name}-earth.png` });
   expect(errors).toEqual([]);
 });
-
-test('scrolling falls inward and advances the chapter', async ({
+test('every checkpoint updates navigation and telemetry; jumps and reverse scroll work', async ({
   page,
 }, info) => {
   await page.goto('/');
-  await expect(page.locator('html')).toHaveClass(/is-ready/);
-  await scrollToChapter(page, 2, 0.45);
-  await expect(page.locator('[data-chapter-name]')).toHaveText('Photon sphere');
-  await expect
-    .poll(async () =>
-      Number(await page.locator('[data-readout="r"]').textContent()),
-    )
-    .toBeLessThan(14);
-  await expect(page.locator('[data-tick="2"]')).toHaveAttribute(
-    'aria-current',
-    'step',
+  for (let i = 0; i < CHECKPOINTS.length; i++) {
+    await jump(page, i);
+    await expect(page.locator('body')).toHaveAttribute(
+      'data-checkpoint',
+      CHECKPOINTS[i].id,
+    );
+    await expect(page.locator('#checkpoints')).toHaveValue(CHECKPOINTS[i].id);
+    await expect(
+      page.locator(`.rail a[href="#${CHECKPOINTS[i].id}"]`),
+    ).toHaveAttribute('aria-current', 'step');
+    expect(
+      await page.evaluate(() =>
+        Number.isFinite(window.__horizon!.state().earthKm),
+      ),
+    ).toBe(true);
+    if ([3, 7, 12, 13, 16, 20].includes(i))
+      await page.screenshot({
+        path: `artifacts/${info.project.name}-${CHECKPOINTS[i].id}.png`,
+      });
+  }
+  await expect(page.locator('.summary')).toContainText(
+    'Impossible beyond the horizon',
   );
-  await expect(page.locator('#chapter-3 .copy')).toHaveCSS('opacity', '1');
-  await expect(page.locator('.loader')).toBeHidden();
-  await page.screenshot({
-    path: `artifacts/${info.project.name}-photon-sphere.png`,
-  });
-
-  await scrollToChapter(page, 4, 0.5);
-  await expect(page.locator('[data-chapter-name]')).toHaveText('Time');
-  const home = await page.locator('[data-clock="home"]').textContent();
-  const you = await page.locator('[data-clock="you"]').textContent();
-  expect(you! < home!).toBe(true);
-  expect(await hasHorizontalOverflow(page)).toBe(false);
+  await expect(page.locator('.summary')).toContainText(
+    'We can measure the distance.',
+  );
+  await jump(page, 7);
+  await page.locator('#checkpoints').selectOption('moon');
+  await expect(page.locator('body')).toHaveAttribute('data-checkpoint', 'moon');
+  await page.locator('#checkpoints').selectOption('earth');
+  await expect(page.locator('body')).toHaveAttribute(
+    'data-checkpoint',
+    'earth',
+  );
 });
-
-test('the singularity whites out and falling again inverts the universe', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await expect(page.locator('html')).toHaveClass(/is-ready/);
-  await scrollToChapter(page, 5, 0.97);
-  await expect(page.locator('html')).toHaveClass(/is-white/);
-  const button = page.getByRole('button', { name: /Fall again/ });
-  await expect(button).toBeVisible();
-  await button.click();
-  await expect(page.locator('html')).toHaveClass(/inverted/);
-  await expect(page.locator('[data-descent]')).toHaveText('02');
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(5);
-  await expect(page.locator('html')).not.toHaveClass(/is-white/);
-});
-
-test('full visual motion remains enabled with OS reduced motion', async ({
+test('sources are accessible and motion stays active under OS reduced motion', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.locator('html')).not.toHaveClass(/reduce-motion/);
-  const visual = page.locator('.scroll-cue i').first();
-  expect(
-    await visual.evaluate(
-      (el) => getComputedStyle(el, '::after').animationName,
-    ),
-  ).not.toBe('none');
+  await page.getByRole('button', { name: /Sources & method/ }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('not Horizons vectors');
+  await page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+  const before = await page.evaluate(() => window.__horizon!.frames());
+  await expect
+    .poll(() => page.evaluate(() => window.__horizon!.frames()))
+    .toBeGreaterThan(before + 1);
 });
-test('without WebGL a static illustration and readable title remain', async ({
+test('missing textures leave an illustrated surface and readable science', async ({
   page,
-}, info) => {
+}) => {
+  await page.route('**/textures/*', (route) => route.abort());
+  await page.goto('/');
+  await expect
+    .poll(() => page.evaluate(() => window.__horizon!.textureFailures()))
+    .toBeGreaterThan(0);
+  await expect(page.locator('#render-status')).toContainText(
+    'illustrated surfaces',
+  );
+  await expect
+    .poll(() => page.evaluate(() => window.__horizon!.frames()))
+    .toBeGreaterThan(1);
+  await jump(page, 3);
+});
+test('without WebGL the full tour and ending remain usable', async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = function (
       this: HTMLCanvasElement,
       type: string,
-      ...rest: unknown[]
+      ...args: unknown[]
     ) {
       if (type.startsWith('webgl')) return null;
-      return (original as (...args: unknown[]) => RenderingContext | null).call(
-        this,
-        type,
-        ...rest,
-      );
+      return original.call(this, type as '2d', ...(args as []));
     } as typeof original;
   });
-  const errors = collectErrors(page);
   await page.goto('/');
   await expect(page.locator('html')).toHaveClass(/no-webgl/);
-  await expect(page.locator('.fallback')).toBeVisible();
-  await expect(page.locator('.hero-title')).toBeVisible();
-  await expect(page.locator('html')).toHaveClass(/is-ready/);
-  await expect(page.locator('.loader')).toBeHidden();
-  await page.screenshot({
-    path: `artifacts/${info.project.name}-no-webgl.png`,
+  await expect(page.locator('#fallback')).toBeVisible();
+  await jump(page, 20);
+  await expect(page.locator('.summary')).toContainText('Physical return');
+});
+
+test('hidden-tab suspension resumes without a time jump', async ({ page }) => {
+  await page.goto('/');
+  await expect
+    .poll(() => page.evaluate(() => window.__horizon!.frames()))
+    .toBeGreaterThan(2);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      get: () => true,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
   });
-  expect(errors).toEqual([]);
+  const stopped = await page.evaluate(() => window.__horizon!.frames());
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__horizon!.frames())).toBe(stopped);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      get: () => false,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect
+    .poll(() => page.evaluate(() => window.__horizon!.frames()))
+    .toBeGreaterThan(stopped);
 });

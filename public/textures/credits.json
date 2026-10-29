@@ -1,0 +1,47 @@
+[
+  {
+    "file": "earth.jpg",
+    "credit": "NASA imagery distributed with the Three.js examples",
+    "source": "https://github.com/mrdoob/three.js/blob/dev/examples/textures/planets/earth_day_4096.jpg"
+  },
+  {
+    "file": "moon.jpg",
+    "credit": "NASA imagery distributed with the Three.js examples",
+    "source": "https://github.com/mrdoob/three.js/blob/dev/examples/textures/planets/moon_1024.jpg"
+  },
+  {
+    "file": "venus.jpg",
+    "credit": "NASA / JPL \u2014 NASA 3D Resources",
+    "source": "https://github.com/nasa/NASA-3D-Resources/blob/master/Images%20and%20Textures/Venus/Venus.jpg"
+  },
+  {
+    "file": "mars.jpg",
+    "credit": "NASA / JPL \u2014 NASA 3D Resources",
+    "source": "https://github.com/nasa/NASA-3D-Resources/blob/master/Images%20and%20Textures/Mars/Mars.jpg"
+  },
+  {
+    "file": "jupiter.jpg",
+    "credit": "NASA / JPL \u2014 NASA 3D Resources",
+    "source": "https://github.com/nasa/NASA-3D-Resources/blob/master/Images%20and%20Textures/Jupiter/Jupiter.jpg"
+  },
+  {
+    "file": "saturn.jpg",
+    "credit": "NASA / JPL \u2014 NASA 3D Resources",
+    "source": "https://github.com/nasa/NASA-3D-Resources/blob/master/Images%20and%20Textures/Saturn/Saturn.jpg"
+  },
+  {
+    "file": "neptune.jpg",
+    "credit": "NASA / JPL \u2014 NASA 3D Resources",
+    "source": "https://github.com/nasa/NASA-3D-Resources/blob/master/Images%20and%20Textures/Neptune/Neptune.jpg"
+  },
+  {
+    "file": "clouds.png",
+    "credit": "NASA imagery distributed with Three.js examples",
+    "source": "https://github.com/mrdoob/three.js/tree/dev/examples/textures/planets"
+  },
+  {
+    "file": "night.png",
+    "credit": "NASA imagery distributed with Three.js examples",
+    "source": "https://github.com/mrdoob/three.js/tree/dev/examples/textures/planets"
+  }
+]

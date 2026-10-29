@@ -1,313 +1,207 @@
 <!doctype html>
-<html lang="en" class="is-overview">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#030304" />
+    <meta name="theme-color" content="#020609" />
     <meta
       name="description"
-      content="A scroll-driven descent into a black hole, rendered live with a relativistic ray-marching shader."
+      content="An educational scroll journey from Earth to Gaia BH1, the nearest confirmed black hole. Explore worlds, distances, and the limits of our knowledge."
     />
-    <title>Event Horizon</title>
+    <title>Event Horizon — From Earth to the Unknown</title>
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23030304'/%3E%3Cellipse cx='16' cy='16' rx='14' ry='4' fill='none' stroke='%23ff9a52' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23030304' stroke='%23ffe2c4' stroke-width='1.5'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='%23020609' stroke='%2374cfff' stroke-width='2'/%3E%3C/svg%3E"
     />
   </head>
   <body>
-    <canvas id="sky" aria-hidden="true"></canvas>
-    <div class="fallback" aria-hidden="true">
-      <div class="fallback__disk"></div>
-      <div class="fallback__shadow"></div>
+    <canvas id="universe" aria-hidden="true"></canvas>
+    <div id="fallback" aria-hidden="true">
+      <div class="fallback-body"></div>
     </div>
-    <div class="grain" aria-hidden="true"></div>
-    <div class="frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-
-    <div class="loader" role="status" aria-live="polite">
-      <p class="loader__label">Integrating null geodesics</p>
-      <p class="loader__count">
-        <span data-loader-count>000</span><small>%</small>
-      </p>
+    <div class="blackhole-target" aria-hidden="true">
+      <i></i><span>GAIA BH1 · DORMANT</span>
     </div>
-
-    <header class="hud hud--top">
-      <a class="brand" href="#chapter-1" aria-label="HZ-1, back to the start">
-        <span class="brand__mark" aria-hidden="true"></span>HZ&#8209;1
-      </a>
-      <dl class="readout" aria-label="Telemetry">
-        <div>
-          <dt>r</dt>
-          <dd data-readout="r">30.00</dd>
-          <dt class="unit">rₛ</dt>
-        </div>
-        <div>
-          <dt>z</dt>
-          <dd data-readout="z">0.017</dd>
-        </div>
-        <div class="readout__wide">
-          <dt>v<sub>esc</sub></dt>
-          <dd data-readout="vesc">0.18</dd>
-          <dt class="unit">c</dt>
-        </div>
-      </dl>
+    <div class="vignette" aria-hidden="true"></div>
+    <header class="masthead">
+      <a href="#earth" class="brand"
+        ><span class="brand-orbit" aria-hidden="true"></span> EVENT HORIZON
+        <small>A FIELD GUIDE TO DISTANCE</small></a
+      >
+      <div class="navigation">
+        <label class="checkpoint-picker"
+          >Jump to
+          <select
+            id="checkpoints"
+            aria-label="Choose a checkpoint"
+          ></select></label
+        ><button id="sources-open" type="button">
+          Sources &amp; method <span aria-hidden="true">＋</span>
+        </button>
+      </div>
     </header>
-
-    <nav class="gauge" aria-label="Chapters">
-      <div class="gauge__rail">
-        <div class="gauge__fill" data-gauge-fill></div>
+    <div class="mission-meta">
+      <span><i></i> EARTH → GAIA BH1</span
+      ><span>21 CHECKPOINTS · A CURATED TOUR</span>
+    </div>
+    <main id="journey"></main>
+    <nav class="rail" aria-label="Journey checkpoints" id="rail"></nav>
+    <footer class="flight-deck" aria-label="Journey telemetry">
+      <div>
+        <span>DISTANCE TO EARTH’S CENTRE</span
+        ><strong id="earth-distance">26,371 km</strong
+        ><small id="earth-miles"></small>
       </div>
-      <ol class="gauge__ticks">
-        <li>
-          <a href="#chapter-1" data-tick="0"><span>I</span><em>Approach</em></a>
-        </li>
-        <li>
-          <a href="#chapter-2" data-tick="1"
-            ><span>II</span><em>Accretion</em></a
-          >
-        </li>
-        <li>
-          <a href="#chapter-3" data-tick="2"
-            ><span>III</span><em>Photon sphere</em></a
-          >
-        </li>
-        <li>
-          <a href="#chapter-4" data-tick="3"><span>IV</span><em>Tides</em></a>
-        </li>
-        <li>
-          <a href="#chapter-5" data-tick="4"><span>V</span><em>Time</em></a>
-        </li>
-        <li>
-          <a href="#chapter-6" data-tick="5"
-            ><span>VI</span><em>Singularity</em></a
-          >
-        </li>
-      </ol>
-      <div class="gauge__marker" data-gauge-marker aria-hidden="true">
-        <span data-gauge-r>30.0</span>
+      <div>
+        <span>TOUR DISTANCE TRAVELLED</span
+        ><strong id="route-distance">0 km</strong
+        ><small id="compression"></small>
       </div>
-    </nav>
-
-    <footer class="hud hud--bottom">
-      <p class="chapter-label" data-chapter-label aria-live="polite">
-        <span data-chapter-index>I</span
-        ><span class="chapter-label__of">/ VI</span>
-        <span data-chapter-name>Approach</span>
-      </p>
-      <dl class="clocks" aria-label="Clocks">
-        <div>
-          <dt>Home</dt>
-          <dd data-clock="home">00:00:00.00</dd>
-        </div>
-        <div>
-          <dt>You, seen from home</dt>
-          <dd data-clock="you">00:00:00.00</dd>
-        </div>
-      </dl>
+      <div>
+        <span>LIGHT-EQUIVALENT TIME / 1c</span
+        ><strong id="light-time">0 seconds</strong
+        ><small>1c comparison · not a human flight</small>
+      </div>
+      <div>
+        <span>AT PARKER’S RECORD SPEED</span
+        ><strong id="parker-time">0 seconds</strong
+        ><small>430,000 mph held constant · illustrative</small>
+      </div>
+      <div class="remaining">
+        <span>REMAINING TOUR DISTANCE</span
+        ><strong id="remaining-distance"></strong
+        ><small>Includes educational detours</small>
+      </div>
     </footer>
-
-    <div class="reticle" aria-hidden="true"><span></span></div>
-
-    <main>
-      <section class="mission-intro" id="top">
-        <nav aria-label="Mission navigation">
-          <a href="#top">EVENT HORIZON / EXPEDITIONS</a
-          ><a href="#chapter-1">The journey ↘</a>
-        </nav>
-        <p class="mission-kicker">An expedition beyond the familiar</p>
-        <h1>Some horizons<br />change everything.</h1>
-        <p class="mission-lede">
-          A digital expedition to the edge of a black hole. Follow the light,
-          discover the forces, and see the universe from a different
-          perspective.
+    <dialog id="sources" aria-labelledby="sources-title">
+      <div class="dialog-top">
+        <p class="eyebrow">THE SCIENCE BEHIND THE JOURNEY</p>
+        <button id="sources-close" type="button" aria-label="Close sources">
+          Close ×
+        </button>
+      </div>
+      <h2 id="sources-title">
+        A map of what we know.<br />A little room for wonder.
+      </h2>
+      <p>
+        This is a guided illustration, not a mission trajectory. Object sizes,
+        spacing, rotation and transit time are rescaled for readability. Full
+        animation is independent of OS motion settings.
+      </p>
+      <details open>
+        <summary>Reference snapshot · 29 October 2026</summary>
+        <p>
+          Planet centres are reproducible, low-precision positions from
+          published J2000 Kepler elements propagated to this date, in a
+          Sun-centred ecliptic frame, then translated relative to Earth. Direct
+          JPL Horizons retrieval was unavailable during preparation; these are
+          explicitly <b>not Horizons vectors</b> or navigation-grade positions.
+          The Moon uses mean distance. Voyager’s distance is a NASA-baseline
+          estimate, with an illustrative direction. Stellar distances and
+          directions are approximate catalogue references, held fixed during
+          this virtual journey.
         </p>
-        <a class="mission-cta" href="#chapter-1"
-          >Begin the descent <span>↓</span></a
+        <a
+          href="https://ssd.jpl.nasa.gov/planets/approx_pos.html"
+          target="_blank"
+          rel="noreferrer"
+          >JPL approximate planetary positions</a
         >
-        <div class="mission-overview">
-          <div>
-            <b>01 — Observe</b>
-            <p>Watch light bend around a world of impossible gravity.</p>
-          </div>
-          <div>
-            <b>02 — Understand</b>
-            <p>Six chapters. Two clocks. One extraordinary journey.</p>
-          </div>
-          <div>
-            <b>03 — Experience</b>
-            <p>A live simulation you explore at your own pace.</p>
-          </div>
-        </div>
-        <small>Fictional exploration brand · Interactive design study</small>
-      </section>
-      <section class="chapter chapter--hero" id="chapter-1" data-chapter="0">
-        <div class="stage">
-          <h2 class="hero-title"><span>Event</span> <span>Horizon</span></h2>
-          <div class="copy copy--left" data-reveal>
-            <p class="eyebrow"><span>Chapter I</span> Approach</p>
-            <p class="lede">
-              Object HZ&#8209;1 holds four million suns inside a sphere smaller
-              than the orbit of Mercury. You are thirty Schwarzschild radii out,
-              and already falling.
-            </p>
-            <p class="note">
-              That ring behind it is the title of this page. Its light went
-              around the back of the hole to reach you.
-            </p>
-          </div>
-          <div class="scroll-cue" data-cue>
-            <span>Scroll to fall</span><i aria-hidden="true"></i>
-          </div>
-          <p class="lens-hint" data-cue>
-            Move the cursor to drag a second, smaller lens.
-          </p>
-        </div>
-      </section>
-
-      <section class="chapter" id="chapter-2" data-chapter="1">
-        <div class="stage">
-          <div class="copy copy--right" data-reveal>
-            <p class="eyebrow"><span>Chapter II</span> Accretion</p>
-            <h2 data-split>The disk</h2>
-            <p class="lede">
-              Gas spirals inward at a large fraction of light speed, heated past
-              ten million kelvin. The side racing toward you burns blue-white;
-              the side falling away reddens and dims.
-            </p>
-            <p class="note">Same gas, different direction.</p>
-            <dl class="stats">
-              <div>
-                <dt>Disk temperature here</dt>
-                <dd><b data-stat="temp">2.1</b><span>× 10⁶ K</span></dd>
-              </div>
-              <div>
-                <dt>Orbital speed here</dt>
-                <dd><b data-stat="orbit">0.13</b><span>c</span></dd>
-              </div>
-              <div>
-                <dt>Doppler boost</dt>
-                <dd><b data-stat="boost">1.14</b><span>×</span></dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-      </section>
-
-      <section class="chapter" id="chapter-3" data-chapter="2">
-        <div class="stage">
-          <svg
-            class="orbit"
-            viewBox="0 0 600 600"
-            aria-hidden="true"
-            data-orbit
-          >
-            <defs>
-              <path
-                id="orbit-path"
-                d="M300,300 m-240,0 a240,240 0 1,1 480,0 a240,240 0 1,1 -480,0"
-              />
-            </defs>
-            <circle cx="300" cy="300" r="240" class="orbit__ring" />
-            <circle
-              cx="300"
-              cy="300"
-              r="276"
-              class="orbit__ring orbit__ring--faint"
-            />
-            <text>
-              <textPath href="#orbit-path" startOffset="0">
-                LIGHT ORBITS HERE · r = 1.5 rₛ · EVERY RING IS THE SAME DISK,
-                LENSED AGAIN · LIGHT ORBITS HERE · r = 1.5 rₛ ·
-              </textPath>
-            </text>
-          </svg>
-          <div class="copy copy--left" data-reveal>
-            <p class="eyebrow"><span>Chapter III</span> Photon sphere</p>
-            <h2 data-split>Light, orbiting</h2>
-            <p class="lede">
-              At one and a half Schwarzschild radii, a photon can circle the
-              hole and come back to where it started. Every thin ring you see is
-              the disk again, lensed over the top, under the bottom, around the
-              back.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="chapter" id="chapter-4" data-chapter="3">
-        <div class="stage">
-          <p class="stretch" data-stretch aria-label="Spaghettification">
-            SPAGHETTIFICATION
-          </p>
-          <div class="copy copy--right copy--low" data-reveal>
-            <p class="eyebrow"><span>Chapter IV</span> Tides</p>
-            <p class="lede">
-              Your feet are closer than your head, so they fall faster. Near a
-              small black hole that difference pulls you into a thread long
-              before the horizon. Around a giant like this one you cross the
-              edge intact. The stretching comes later.
-            </p>
-            <dl class="stats stats--inline">
-              <div>
-                <dt>Tidal stretch vs. start</dt>
-                <dd><b data-stat="tide">1</b><span>×</span></dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-      </section>
-
-      <section class="chapter" id="chapter-5" data-chapter="4">
-        <div class="stage">
-          <div class="dilation" data-reveal>
-            <p class="eyebrow"><span>Chapter V</span> Time</p>
-            <h2 data-split>Two clocks</h2>
-            <div class="dilation__clocks">
-              <figure>
-                <figcaption>Home</figcaption>
-                <p data-big-clock="home">00:00:00</p>
-              </figure>
-              <figure>
-                <figcaption>Your clock, as seen from home</figcaption>
-                <p data-big-clock="you">00:00:00</p>
-              </figure>
-            </div>
-            <p class="dilation__rate">
-              Each of your seconds lasts <b data-stat="rate">1.02</b> seconds at
-              home.
-            </p>
-            <p class="lede">
-              Watched from far away, you slow, redden, and freeze at the edge.
-              You never see yourself cross. They never see you arrive.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="chapter chapter--end" id="chapter-6" data-chapter="5">
-        <div class="stage">
-          <div class="copy copy--center" data-reveal>
-            <p class="eyebrow"><span>Chapter VI</span> Singularity</p>
-            <h2 data-split>No light, no here</h2>
-            <p class="lede">
-              Inside the horizon every path points forward in time, toward the
-              center. Physics runs out of words before you run out of distance.
-            </p>
-          </div>
-          <div class="finale" data-finale>
-            <p class="finale__line">Every geodesic ends.</p>
-            <button type="button" class="finale__button" data-fall-again>
-              <span>Fall again</span>
-              <small>and invert the universe</small>
-            </button>
-            <a class="mission-return" href="#top"
-              >Return to mission overview ↑</a
-            >
-            <p class="finale__count">Descent <span data-descent>01</span></p>
-          </div>
-        </div>
-      </section>
-    </main>
-
+      </details>
+      <details>
+        <summary>Distance, time, and what 1c means</summary>
+        <p>
+          Direct Earth distance is straight-line displacement. Tour distance is
+          sampled along a curved route through the stops; it is longer because
+          of detours. Light-equivalent time is tour distance ÷ 299,792.458 km/s.
+          A massive spacecraft cannot reach light speed. Parker times assume its
+          record speed is sustained indefinitely, without acceleration, braking
+          or fuel limits. Displayed values are rounded; they are not mission
+          forecasts or a traveller’s proper time.
+        </p>
+        <a
+          href="https://science.nasa.gov/science-research/heliophysics/nasas-parker-solar-probe-makes-history-with-closest-pass-to-sun/"
+          target="_blank"
+          rel="noreferrer"
+          >NASA · Parker Solar Probe’s speed record</a
+        >
+      </details>
+      <details>
+        <summary>Gaia BH1, tides, and the interior</summary>
+        <p>
+          We use 9.62 solar masses and a non-rotating Schwarzschild model. The
+          horizon radius is about 28.4 km. The tidal display is the Newtonian
+          estimate 2GMh/r³ across h = 2 metres, in m/s²; it is educational, not
+          a biological survival prediction or an exact relativistic calculation.
+          The camera continues after destructive tides as an imaginary observer.
+          A dormant black hole has no luminous accretion disk. The companion and
+          star field are illustrative. Inside, no signal or physical return to
+          Earth is possible; our final overlay is a narrative interface, not
+          transmitted telemetry.
+        </p>
+        <a
+          href="https://www.esa.int/Science_Exploration/Space_Science/Gaia/Gaia_discovers_a_new_family_of_black_holes"
+          target="_blank"
+          rel="noreferrer"
+          >ESA · Gaia’s dormant black holes</a
+        ><a
+          href="https://science.nasa.gov/universe/black-holes/supermassive-black-holes/new-nasa-black-hole-visualization-takes-viewers-beyond-the-brink/"
+          target="_blank"
+          rel="noreferrer"
+          >NASA · Crossing a black-hole horizon</a
+        >
+      </details>
+      <details>
+        <summary>Worlds, boundaries, and source references</summary>
+        <a
+          href="https://science.nasa.gov/earth/facts/"
+          target="_blank"
+          rel="noreferrer"
+          >NASA · Earth facts</a
+        ><a
+          href="https://science.nasa.gov/solar-system/"
+          target="_blank"
+          rel="noreferrer"
+          >NASA · Solar system</a
+        ><a
+          href="https://science.nasa.gov/solar-system/oort-cloud/facts/"
+          target="_blank"
+          rel="noreferrer"
+          >NASA · Oort Cloud: knowns and unknowns</a
+        ><a
+          href="https://science.nasa.gov/mission/voyager/voyager-1/"
+          target="_blank"
+          rel="noreferrer"
+          >NASA · Voyager 1 baseline (164.7 AU, August 21, 2024)</a
+        ><a
+          href="https://science.nasa.gov/exoplanets/other-stars-other-worlds/our-nearest-celestial-neighbor-an-exotic-3-star-system/"
+          target="_blank"
+          rel="noreferrer"
+          >NASA · Proxima Centauri</a
+        >
+      </details>
+      <details>
+        <summary>Imagery and visual credits</summary>
+        <p>
+          NASA / JPL — NASA 3D Resources: Venus, Mars, Jupiter, Saturn and
+          Neptune maps. NASA Earth day/night imagery and lunar/cloud maps
+          distributed with the Three.js examples. Asset-specific provenance is
+          bundled in
+          <a href="/textures/credits.json" target="_blank" rel="noreferrer"
+            >the texture credits</a
+          >. Mercury, Uranus, stars, spacecraft geometry, rings and distant
+          populations are illustrative materials or geometry. No live Google
+          Earth, cloud, weather or terrain services are used.
+        </p>
+        <a
+          href="https://github.com/nasa/NASA-3D-Resources"
+          target="_blank"
+          rel="noreferrer"
+          >NASA’s public 3D resource collection</a
+        >
+      </details>
+    </dialog>
+    <div class="render-status" role="status" id="render-status"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

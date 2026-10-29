@@ -2,312 +2,256 @@ import '@fontsource/instrument-serif/400.css';
 import '@fontsource/instrument-serif/400-italic.css';
 import '@fontsource-variable/jetbrains-mono/wght.css';
 import './styles.css';
-import { gsap } from 'gsap';
 import Lenis from 'lenis';
-import { Vector3 } from 'three';
-import { cameraAt } from './camera';
-import { ScrollTrigger, setupChapters } from './chapters';
-import { BlackHoleRenderer } from './renderer';
-import { drawTitle } from './title';
-
-const CHAPTERS = [
-  'Approach',
-  'Accretion',
-  'Photon sphere',
-  'Tides',
-  'Time',
-  'Singularity',
-];
-const NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI'];
-
-const root = document.documentElement;
-const reduceMotion = false;
-root.classList.toggle('reduce-motion', reduceMotion);
-
-const $ = <T extends Element = HTMLElement>(selector: string) =>
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { CHECKPOINTS, stateAt, TOTAL, type JourneyState } from './journey';
+import {
+  C,
+  LY,
+  RS,
+  EARTH_RADIUS,
+  BH_MASS,
+  AU,
+  PARKER,
+  distance,
+  duration,
+  tidal,
+  travelTime,
+  clamp,
+} from './science';
+import { JourneyRenderer } from './renderer';
+gsap.registerPlugin(ScrollTrigger);
+const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
-
-const canvas = $<HTMLCanvasElement>('#sky');
-const sky = BlackHoleRenderer.create(canvas);
-root.classList.add(sky ? 'has-webgl' : 'no-webgl');
-
-const lenis = reduceMotion
-  ? null
-  : new Lenis({ lerp: 0.085, wheelMultiplier: 0.9 });
-if (lenis) {
-  lenis.on('scroll', ScrollTrigger.update);
-  gsap.ticker.add((time) => lenis.raf(time * 1000));
-  gsap.ticker.lagSmoothing(0);
+const main = $('#journey'),
+  rail = $('#rail'),
+  picker = $<HTMLSelectElement>('#checkpoints');
+const number = (n: number) =>
+  n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+const metric = (label: string, value: string) =>
+  `<div data-metric="${label}"><dt>${label}</dt><dd>${value}</dd></div>`;
+for (const [index, p] of CHECKPOINTS.entries()) {
+  const el = document.createElement('section');
+  el.id = p.id;
+  el.className = `chapter chapter--${p.kind}`;
+  el.dataset.checkpoint = String(index);
+  el.setAttribute('aria-labelledby', `${p.id}-title`);
+  const physical = p.radius && p.kind !== 'blackhole' && p.kind !== 'interior';
+  const stats = physical
+    ? [
+        ['Diameter', `${number(p.radius * 2)} km`],
+        ['Mass', `${p.mass.toExponential(3)} kg`],
+        ['Diameter / Earth', `${(p.radius / EARTH_RADIUS).toFixed(2)} ×`],
+        [
+          'Camera surface range',
+          `${number(p.range)} km / ${number(p.range / 1.609344)} mi`,
+        ],
+        ['Light to surface', duration(p.range / C)],
+        ['At Parker speed', duration(p.range / PARKER)],
+        ...(p.facts ?? []),
+      ]
+    : p.bhRadius
+      ? [
+          ['Mass', `${(BH_MASS / 1.98847e30).toFixed(2)} solar masses`],
+          ['Horizon radius', `${RS.toFixed(1)} km`],
+          ['Virtual camera radius', `${p.bhRadius} rₛ`],
+          [
+            'Tidal difference / 2 m',
+            `${tidal(p.bhRadius * RS).toExponential(2)} m/s²`,
+          ],
+          [
+            'Return signal',
+            p.bhRadius <= 1 ? 'Cannot escape' : 'Outside horizon',
+          ],
+          [
+            'Viewpoint',
+            index >= 17 ? 'Virtual camera' : 'Illustrated observation',
+          ],
+        ]
+      : (p.facts ?? []);
+  el.innerHTML = `<div class="chapter-panel"><article class="story"><p class="eyebrow">${p.eyebrow}</p><h${index === 0 ? '1' : '2'} id="${p.id}-title">${p.title}</h${index === 0 ? '1' : '2'}><p class="description">${p.description}</p>${index === 0 ? '<a class="begin" href="#moon">Begin the journey <span aria-hidden="true">↓</span></a>' : ''}<p class="note">${p.note}</p></article><aside class="body-facts" aria-label="${p.name} facts"><p class="facts-title">${p.name.toUpperCase()} / FIELD NOTES</p><dl>${stats.map(([a, b]) => metric(a, b)).join('')}</dl></aside></div>`;
+  if (index === 20)
+    el.innerHTML += `<div class="summary"><p class="eyebrow">YOUR EXPEDITION / A LIGHT-EQUIVALENT RECAP</p><h2>One Earth.<br>A universe of perspective.</h2><dl>${metric('Earth → Gaia BH1', '≈ 1,560 light-years')}${metric('Curated tour length', distance(TOTAL))}${metric('At the speed of light', duration(travelTime(TOTAL)))}${metric('At Parker’s record speed', duration(travelTime(TOTAL, PARKER)))}${metric('Physical return', 'Impossible beyond the horizon')}</dl><p>These are distance/speed comparisons, not a feasible human flight or a measure of experienced time. The virtual camera has ended inside the horizon.</p><blockquote>“We can measure the distance. We are still learning what lies beyond.”</blockquote><p class="eyebrow">EVENT HORIZON · ORIGINAL CLOSING LINE</p><details><summary>The 21 checkpoints you explored</summary><ol>${CHECKPOINTS.map((c) => `<li><a href="#${c.id}">${c.name}</a></li>`).join('')}</ol></details><a class="begin" href="#earth">Return to Earth <span aria-hidden="true">↑</span></a></div>`;
+  main.append(el);
+  const link = document.createElement('a');
+  link.href = `#${p.id}`;
+  link.setAttribute('aria-label', `${index + 1}. ${p.name}`);
+  link.innerHTML = `<span>${String(index + 1).padStart(2, '0')}</span><em>${p.name}</em>`;
+  rail.append(link);
+  picker.add(
+    new Option(`${String(index + 1).padStart(2, '0')} / ${p.name}`, p.id),
+  );
 }
-
-setupChapters(reduceMotion);
-
+const lenis = new Lenis({ lerp: 0.09, wheelMultiplier: 0.85 });
+lenis.on('scroll', ScrollTrigger.update);
 const sections = [...document.querySelectorAll<HTMLElement>('.chapter')];
-
-/** Maps scroll position to 0..1 with one equal slice per chapter. */
-function readScroll() {
-  const vh = window.innerHeight;
-  for (let i = sections.length - 1; i >= 0; i--) {
-    const rect = sections[i].getBoundingClientRect();
-    if (rect.top <= 1 || i === 0) {
-      const span = rect.height - (i === sections.length - 1 ? vh : 0);
-      const local = Math.min(Math.max(-rect.top / Math.max(span, 1), 0), 1);
-      return { chapter: i, local, progress: (i + local) / sections.length };
+function go(id: string) {
+  const section = document.getElementById(id);
+  if (!section) return;
+  lenis.scrollTo(section, {
+    duration: 1.25,
+    onComplete: () => {
+      $(`#${id}-title`).setAttribute('tabindex', '-1');
+      $(`#${id}-title`).focus({ preventScroll: true });
+    },
+  });
+  history.replaceState(null, '', `#${id}`);
+}
+picker.addEventListener('change', () => go(picker.value));
+document.addEventListener('click', (event) => {
+  const link = (event.target as HTMLElement).closest<HTMLAnchorElement>(
+    'a[href^="#"]',
+  );
+  if (link && CHECKPOINTS.some((p) => `#${p.id}` === link.hash)) {
+    event.preventDefault();
+    go(link.hash.slice(1));
+  }
+});
+const dialog = $<HTMLDialogElement>('#sources');
+$('#sources-open').addEventListener('click', () => {
+  dialog.showModal();
+  lenis.stop();
+});
+$('#sources-close').addEventListener('click', () => dialog.close());
+dialog.addEventListener('close', () => lenis.start());
+const renderer = JourneyRenderer.create($<HTMLCanvasElement>('#universe'));
+document.documentElement.classList.add(renderer ? 'has-webgl' : 'no-webgl');
+if (!renderer)
+  $('#render-status').textContent =
+    'Static illustration mode · all checkpoints and science remain available.';
+let telemetryAt = -1;
+let active = -1,
+  state: JourneyState = stateAt(0, 0),
+  time = 0,
+  last = performance.now(),
+  visible = !document.hidden;
+const links = [...rail.querySelectorAll('a')];
+function read() {
+  let i = 0;
+  for (let k = sections.length - 1; k >= 0; k--) {
+    if (sections[k].getBoundingClientRect().top <= innerHeight * 0.06) {
+      i = k;
+      break;
     }
   }
-  return { chapter: 0, local: 0, progress: 0 };
+  const rect = sections[i].getBoundingClientRect();
+  return stateAt(
+    i,
+    clamp(-rect.top / Math.max(1, rect.height - innerHeight * 0.12)),
+  );
 }
-
-const readout = {
-  r: $('[data-readout="r"]'),
-  z: $('[data-readout="z"]'),
-  vesc: $('[data-readout="vesc"]'),
-  gaugeFill: $('[data-gauge-fill]'),
-  gaugeMarker: $('[data-gauge-marker]'),
-  gaugeR: $('[data-gauge-r]'),
-  chapterIndex: $('[data-chapter-index]'),
-  chapterName: $('[data-chapter-name]'),
-  clockHome: $('[data-clock="home"]'),
-  clockYou: $('[data-clock="you"]'),
-  bigHome: $('[data-big-clock="home"]'),
-  bigYou: $('[data-big-clock="you"]'),
-  temp: $('[data-stat="temp"]'),
-  orbit: $('[data-stat="orbit"]'),
-  boost: $('[data-stat="boost"]'),
-  tide: $('[data-stat="tide"]'),
-  rate: $('[data-stat="rate"]'),
-  ticks: [...document.querySelectorAll<HTMLElement>('[data-tick]')],
-};
-
-const pad = (n: number, width = 2) =>
-  String(Math.floor(n)).padStart(width, '0');
-const formatClock = (seconds: number, centis = true) => {
-  const h = seconds / 3600;
-  const m = (seconds / 60) % 60;
-  const s = seconds % 60;
-  const base = `${pad(h)}:${pad(m)}:${pad(s)}`;
-  return centis ? `${base}.${pad((seconds % 1) * 100)}` : base;
-};
-
-const state = {
-  progress: 0,
-  homeTime: 0,
-  youTime: 0,
-  lens: { x: 0, y: 0, presence: 0, targetPresence: 0 },
-  invert: { value: 0 },
-  whiteout: 0,
-  chapter: -1,
-  descent: 1,
-  lastTime: performance.now(),
-  running: true,
-};
-
-const reticle = $('.reticle');
-window.addEventListener('pointermove', (event) => {
-  if (event.pointerType === 'touch') return;
-  state.lens.x = (event.clientX / window.innerWidth) * 2 - 1;
-  state.lens.y = 1 - (event.clientY / window.innerHeight) * 2;
-  state.lens.targetPresence = 1;
-  reticle.style.transform = `translate3d(${event.clientX}px, ${event.clientY}px, 0)`;
-  root.classList.add('has-pointer');
-});
-document.addEventListener('pointerleave', () => {
-  state.lens.targetPresence = 0;
-  root.classList.remove('has-pointer');
-});
-
-let portrait = window.innerWidth < window.innerHeight;
-function applyTitle() {
-  if (!sky) return;
-  const art = drawTitle(portrait);
-  sky.setTitle(art.canvas, art.worldWidth);
-}
-
-window.addEventListener('resize', () => {
-  sky?.resize();
-  const nowPortrait = window.innerWidth < window.innerHeight;
-  if (nowPortrait !== portrait) {
-    portrait = nowPortrait;
-    applyTitle();
+function update() {
+  const p = CHECKPOINTS[state.index];
+  if (renderer?.textureFailures)
+    $('#render-status').textContent =
+      'Some imagery unavailable · illustrated surfaces remain active.';
+  if (active !== state.index) {
+    active = state.index;
+    document.body.dataset.checkpoint = p.id;
+    document.documentElement.style.setProperty('--accent', p.color);
+    picker.value = p.id;
+    links.forEach((l, i) => {
+      if (i === active) l.setAttribute('aria-current', 'step');
+      else l.removeAttribute('aria-current');
+    });
+    document.documentElement.style.setProperty('--fallback-color', p.color);
+    document.documentElement.dataset.kind = p.kind;
   }
-});
-
+  const activeSection = sections[state.index];
+  for (const [label, value] of [
+    [
+      'Camera surface range',
+      `${number(state.localRangeKm)} km / ${number(state.localRangeKm / 1.609344)} mi`,
+    ],
+    ['Light to surface', duration(state.localRangeKm / C)],
+    ['At Parker speed', duration(state.localRangeKm / PARKER)],
+    ['Virtual camera radius', `${state.bhRadius.toFixed(2)} rₛ`],
+    [
+      'Tidal difference / 2 m',
+      `${tidal(state.bhRadius * RS).toExponential(2)} m/s²`,
+    ],
+  ]) {
+    const dd = activeSection.querySelector(`[data-metric="${label}"] dd`);
+    if (dd) dd.textContent = value;
+  }
+  $('#earth-distance').textContent = distance(state.earthKm);
+  $('#earth-miles').textContent =
+    `${number(state.earthKm / 1.609344)} mi · ${state.index >= 19 ? 'no return signal' : `light home: ${duration(state.earthKm / C)}`}`;
+  $('#route-distance').textContent = distance(state.routeKm);
+  $('#remaining-distance').textContent = distance(state.remainingKm);
+  document.querySelector('.mission-meta span:last-child')!.textContent =
+    `REMAINING: ${distance(state.remainingKm)}`;
+  $('#light-time').textContent = duration(travelTime(state.routeKm));
+  $('#parker-time').textContent = duration(travelTime(state.routeKm, PARKER));
+  const legDistance =
+    state.remainingKm && state.index < CHECKPOINTS.length - 1
+      ? stateAt(state.index, 1).routeKm - stateAt(state.index, 0).routeKm
+      : 0;
+  $('#compression').textContent = legDistance
+    ? `Next transit spans ${duration(legDistance / C)} at 1c`
+    : state.index >= 19
+      ? 'No physical return beyond the horizon'
+      : 'Local approach · distance scale changes';
+  document.documentElement.style.setProperty(
+    '--progress',
+    String((state.index + state.local) / CHECKPOINTS.length),
+  );
+}
+function frame() {
+  const now = performance.now(),
+    dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  if (!visible) return;
+  time += dt;
+  lenis.raf(now);
+  state = read();
+  if (state.index !== active || now - telemetryAt >= 100) {
+    update();
+    telemetryAt = now;
+  }
+  renderer?.render(state, time);
+}
+gsap.ticker.add(frame);
+gsap.ticker.lagSmoothing(0);
 document.addEventListener('visibilitychange', () => {
-  state.running = document.visibilityState === 'visible';
-  state.lastTime = performance.now();
-  sky?.resetTiming();
+  visible = !document.hidden;
+  last = performance.now();
+  renderer?.resetTiming();
 });
-
-$('[data-fall-again]').addEventListener('click', () => {
-  state.descent++;
-  $('[data-descent]').textContent = pad(state.descent);
-  const inverted = state.descent % 2 === 0;
-  root.classList.toggle('inverted', inverted);
-  gsap.to(state.invert, {
-    value: inverted ? 1 : 0,
-    duration: reduceMotion ? 0 : 1.4,
-    ease: 'expo.inOut',
-  });
-  if (lenis) lenis.scrollTo(0, { immediate: true });
-  else window.scrollTo(0, 0);
+window.addEventListener('resize', () => {
+  renderer?.resize();
   ScrollTrigger.refresh();
 });
-
-const lensPosition = new Vector3();
-const forward = new Vector3();
-const right = new Vector3();
-const up = new Vector3();
-
-function tick() {
-  const now = performance.now();
-  const dt = Math.min((now - state.lastTime) / 1000, 0.1);
-  state.lastTime = now;
-  if (!state.running) return;
-
-  root.classList.toggle(
-    'is-overview',
-    sections[0].getBoundingClientRect().top > window.innerHeight * 0.3,
+window.addEventListener(
+  'pagehide',
+  () => {
+    gsap.ticker.remove(frame);
+    lenis.destroy();
+    renderer?.dispose();
+  },
+  { once: true },
+);
+if (location.hash && CHECKPOINTS.some((p) => `#${p.id}` === location.hash))
+  requestAnimationFrame(() =>
+    lenis.scrollTo(location.hash, { immediate: true }),
   );
-  const scroll = readScroll();
-  const follow = reduceMotion ? 1 : 1 - Math.exp(-dt * 6);
-  state.progress += (scroll.progress - state.progress) * follow;
-  if (Math.abs(scroll.progress - state.progress) < 1e-5)
-    state.progress = scroll.progress;
-
-  const time = now / 1000;
-  const camera = cameraAt(state.progress, reduceMotion ? 0 : time);
-  const aspect = window.innerWidth / window.innerHeight;
-  // Portrait screens get a slightly wider lens so the hole doesn't fill the width.
-  if (aspect < 1) camera.tanHalfFov *= 1 + 0.35 * (1 - aspect);
-  const r = camera.distance;
-
-  const lens = state.lens;
-  lens.presence += (lens.targetPresence - lens.presence) * Math.min(1, dt * 4);
-  const basis = camera.basis.elements;
-  right.set(basis[0], basis[1], basis[2]);
-  up.set(basis[3], basis[4], basis[5]);
-  forward.set(basis[6], basis[7], basis[8]);
-  // Put the lens on the plane through the hole, directly under the cursor.
-  lensPosition
-    .copy(camera.position)
-    .addScaledVector(forward, r)
-    .addScaledVector(right, lens.x * r * camera.tanHalfFov * aspect)
-    .addScaledVector(up, lens.y * r * camera.tanHalfFov);
-
-  const last = sections.length - 1;
-  const whiteTarget =
-    scroll.chapter === last
-      ? gsap.utils.clamp(0, 1, (scroll.local - 0.55) / 0.3)
-      : 0;
-  state.whiteout = whiteTarget;
-  root.classList.toggle('is-white', whiteTarget > 0.5);
-  root.style.setProperty('--whiteout', whiteTarget.toFixed(3));
-
-  sky?.render({
-    time: reduceMotion ? time * 0.15 : time,
-    camera,
-    lensPosition,
-    lensMass: 0.0028 * r * lens.presence,
-    titleOpacity: gsap.utils.clamp(0, 1, 1 - (state.progress - 0.03) / 0.12),
-    whiteout: state.whiteout,
-    invert: state.invert.value,
-  });
-
-  // Gravitational time dilation for a static observer at radius r.
-  const dilation = Math.sqrt(Math.max(1 - 1 / r, 0));
-  state.homeTime += dt;
-  state.youTime += dt * dilation;
-  updateHud(scroll.chapter, r, dilation);
-}
-
-function updateHud(chapter: number, r: number, dilation: number) {
-  const z = 1 / Math.max(dilation, 1e-4) - 1;
-  const vesc = Math.min(Math.sqrt(1 / r), 1);
-  readout.r.textContent = r.toFixed(2);
-  readout.z.textContent = z < 10 ? z.toFixed(3) : z.toFixed(1);
-  readout.vesc.textContent = vesc.toFixed(2);
-  readout.gaugeR.textContent = r.toFixed(1);
-  readout.gaugeFill.style.transform = `scaleY(${state.progress})`;
-  readout.gaugeMarker.style.top = `${state.progress * 100}%`;
-
-  readout.clockHome.textContent = formatClock(state.homeTime);
-  readout.clockYou.textContent = formatClock(state.youTime);
-  readout.bigHome.textContent = formatClock(state.homeTime, false);
-  readout.bigYou.textContent = formatClock(state.youTime, false);
-  readout.rate.textContent = (1 / Math.max(dilation, 1e-3)).toFixed(2);
-
-  const orbit = Math.min(Math.sqrt(0.5 / r), 0.99);
-  const gamma = 1 / Math.sqrt(1 - orbit * orbit);
-  readout.temp.textContent = (
-    11 * Math.pow(2.4 / Math.max(r, 2.4), 0.75)
-  ).toFixed(1);
-  readout.orbit.textContent = orbit.toFixed(2);
-  readout.boost.textContent = (1 / (gamma * (1 - orbit))).toFixed(2);
-  readout.tide.textContent = Math.round(Math.pow(30 / r, 3)).toLocaleString(
-    'en-US',
-  );
-
-  if (chapter !== state.chapter) {
-    state.chapter = chapter;
-    readout.chapterIndex.textContent = NUMERALS[chapter];
-    readout.chapterName.textContent = CHAPTERS[chapter];
-    root.dataset.chapter = String(chapter);
-    readout.ticks.forEach((tick, i) => {
-      tick.classList.toggle('is-active', i === chapter);
-      tick.classList.toggle('is-past', i < chapter);
-      if (i === chapter) tick.setAttribute('aria-current', 'step');
-      else tick.removeAttribute('aria-current');
-    });
-  }
-}
-
-for (const link of document.querySelectorAll<HTMLAnchorElement>(
-  'a[href^="#chapter-"]',
-)) {
-  link.addEventListener('click', (event) => {
-    event.preventDefault();
-    const target = document.querySelector<HTMLElement>(link.hash);
-    if (!target) return;
-    if (lenis) lenis.scrollTo(target, { duration: 2.4 });
-    else target.scrollIntoView();
-  });
-}
-
-async function boot() {
-  const counter = $('[data-loader-count]');
-  const display = { value: 0 };
-  const loaderTime = reduceMotion ? 10 : 1400;
-  const started = performance.now();
-  gsap.to(display, {
-    value: 92,
-    duration: loaderTime / 1000,
-    ease: 'power3.out',
-    onUpdate: () => (counter.textContent = pad(display.value, 3)),
-  });
-  await Promise.race([
-    Promise.all([
-      document.fonts.load('italic 400 100px "Instrument Serif"'),
-      document.fonts.load('500 20px "JetBrains Mono Variable"'),
-    ]),
-    new Promise((resolve) => setTimeout(resolve, 2500)),
-  ]);
-  applyTitle();
-  gsap.ticker.add(tick);
-  // A plain timer, not the tween, so slow first frames can't hold the loader.
-  const remaining = loaderTime - (performance.now() - started);
-  await new Promise((resolve) => setTimeout(resolve, Math.max(remaining, 0)));
-  counter.textContent = '100';
-  root.classList.add('is-ready');
-}
-
-boot();
-
+update();
 declare global {
   interface Window {
-    __horizon?: { frames: () => number; progress: () => number };
+    __horizon?: {
+      frames: () => number;
+      state: () => JourneyState;
+      textureFailures: () => number;
+      visible: () => boolean;
+      constants: { c: number; ly: number; au: number };
+    };
   }
 }
 window.__horizon = {
-  frames: () => sky?.frames ?? 0,
-  progress: () => state.progress,
+  frames: () => renderer?.frames ?? 0,
+  state: () => state,
+  textureFailures: () => renderer?.textureFailures ?? 0,
+  visible: () => visible,
+  constants: { c: C, ly: LY, au: AU },
 };

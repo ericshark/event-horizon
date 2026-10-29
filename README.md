@@ -1,75 +1,87 @@
-# 01 · Event Horizon
+# Event Horizon — From Earth to the Unknown
 
-A scroll-driven descent into a black hole. Every frame is ray-marched live on
-the GPU: light rays bend around a Schwarzschild mass, the accretion disk is
-Doppler-beamed (the side moving toward you burns blue-white, the side moving
-away reddens), and the Einstein ring wraps the page's own title around the
-hole.
+A continuous educational scroll journey from a rotating Earth to Gaia BH1,
+the nearest confirmed black hole. Twenty-one checkpoints visit the Moon, the
+other planets, the Sun, distant solar-system boundaries, Voyager 1, Proxima
+Centauri, and a dormant stellar-mass black hole before ending inside its horizon.
 
-## Run locally
+## Run and validate
 
-Use Node.js 22.12+ and npm. From this folder:
+Node 22.18+ (Node 24 recommended):
 
 ```sh
-npm install
+npm ci
 npm run dev
-```
-
-Open the URL Vite prints. It starts on port 5174 and moves to the next free
-port if 5174 is busy.
-
-## What to try
-
-- **Look at the title.** "Event Horizon" is drawn into the sky behind the
-  hole, so you are seeing gravitationally lensed typography, not a DOM overlay.
-- **Move the cursor.** It drags a second, weaker lens that warps the stars and
-  disk under it.
-- **Scroll.** Six chapters fly the camera from 30 Schwarzschild radii down to
-  the horizon. The telemetry shows radius, gravitational redshift, and escape
-  velocity, all computed from the camera's actual distance. The two clocks
-  drift apart through gravitational time dilation.
-- **Reach the end.** The page whites out at the singularity. Press
-  _Fall again_ to return to the top with the universe inverted, and press it
-  again next time to flip it back.
-
-## How it works
-
-- `src/blackhole.glsl.ts`: fullscreen fragment shader. Photon paths use the
-  Cartesian form of the Schwarzschild null geodesic
-  (`a = -1.5 h² x / r⁵`, with the Schwarzschild radius = 1). Each step tests
-  for crossings of the disk plane and the title plane.
-- `src/camera.ts`: one camera keyframe per chapter (distance, elevation,
-  azimuth, roll, FOV), eased between.
-- `src/renderer.ts`: three.js wrapper plus a frame-time governor that scales
-  render resolution between 0.2× and 1× device pixels.
-- `src/chapters.ts`: GSAP ScrollTrigger reveals, the orbiting ring, and the
-  stretched "spaghettification" type.
-- `src/main.ts`: Lenis smooth scroll, HUD physics readouts, pointer lens,
-  and the finale.
-
-Rendering pauses while the tab is hidden. Full visual motion is always enabled. Without WebGL2 a CSS
-illustration and the regular title are shown instead. Fonts are bundled
-locally and the page makes no network requests.
-
-## Checks
-
-```sh
 npm run typecheck
 npm run build
-PW_HEADLESS=true npm test
+PW_HEADLESS=true npm test -- --workers=1
 ```
 
-Tests start their own server on port 5201 (`PW_PORT` overrides it), run at
-desktop 1440 × 1000 and mobile 390 × 844 in Chromium with SwiftShader WebGL,
-and save screenshots to `artifacts/`. Software rendering is far slower than a
-real GPU, so the governor drops the resolution during tests.
+Browser tests use installed Chromium at `/usr/bin/chromium`; set
+`CHROMIUM_PATH` for another installation. Software WebGL is much slower than
+hardware and cannot establish real-GPU smoothness. Screenshots cover desktop
+and mobile Earth, Venus, Saturn, Voyager, Oort Cloud, Gaia BH1 and the interior.
 
-## Landing-page template
+## Scientific model and reference data
 
-The entry page now introduces a fictional brand, explains the experience, and
-links to the original interactive showcase. All visual motion runs independently
-of operating-system reduced-motion settings. Hardware quality tiers and WebGL
-fallbacks remain available. Audio still requires a visitor gesture.
+This is a curated tour with explicit detours, enlarged bodies and compressed
+presentation time. It is not a real spacecraft trajectory, live planetary map,
+or navigation tool. Every displayed speed identifies its reference frame.
 
-Browser checks use `/usr/bin/chromium` by default; set `CHROMIUM_PATH` to use
-another installed Chromium binary.
+`src/science.ts` keeps physical quantities in km, kg and seconds. It defines
+unit conversions, light/Parker-speed comparisons, an educational Newtonian
+tidal estimate across two metres, and low-precision orbital positions.
+`src/journey.ts` owns checkpoint content, curved-route sampling, cumulative path
+length, direct Earth displacement, and local camera range. Render units are
+independent of scientific units; each scene uses a local origin.
+
+The reference date is **2026-10-29 00:00 UTC**. Direct access to JPL Horizons was
+blocked by the preparation environment's network policy. The delivered snapshot
+therefore explicitly uses published low-precision J2000 Kepler elements advanced
+by orbital period, **not Horizons vectors**. It does not include full secular
+perturbations. Moon coordinates use mean separation; Voyager's Earth-distance
+estimate is propagated from NASA's 164.7 AU baseline on 2024-08-21 at 3.5 AU/year,
+with an illustrative direction. Proxima/Gaia positions use approximate catalogue
+RA/Dec and distances, converted to the ecliptic frame and held fixed.
+
+Regenerate the documented snapshot with:
+
+```sh
+node scripts/build-reference.mjs
+```
+
+The static file is `public/reference-snapshot.json`. The route bends away from
+celestial surfaces; it is not a gravitationally integrated flight. Distances
+include detours, so cumulative tour length is greater than the approximately
+1,560 ly direct Earth–Gaia BH1 separation. Light-equivalent elapsed time is
+route length/c, not proper time experienced by a human. Parker comparisons
+assume its record 430,000 mph can be held indefinitely and omit acceleration,
+fuel and braking. No actual spacecraft can reach 1c.
+
+Gaia BH1 uses 9.62 solar masses and a non-rotating Schwarzschild lens model.
+There is no accretion disk. Tidal gradients can become destructive before the
+horizon; survival thresholds are not claimed. Interior darkness is a theoretical
+illustration and the interface is narrative, not a return transmission. No
+physical signal or traveller can return after horizon crossing.
+
+## Rendering, motion and assets
+
+One Three.js WebGL context renders local celestial scenes and the dormant
+black-hole ray marcher. Earth has NASA day/night imagery, a separate cloud layer,
+atmospheric scattering approximation and 23.44° axial tilt. Its visible rotation
+is deliberately accelerated (one turn per 120 seconds); physical rotation data
+remain labeled separately. Saturn's rings, the sparse Oort Cloud, heliopause,
+Voyager geometry, Mercury and Uranus materials are illustrative.
+
+Earth loads first; the next checkpoint's imagery preloads. Adaptive render
+resolution responds to slow frames without changing physical measurements.
+Hidden tabs pause the render loop, bounded deltas prevent resume jumps, and
+failed textures use illustrated surfaces. No-WebGL mode retains static visuals,
+all checkpoint descriptions, measurements and navigation. Full visual motion
+is independent of OS reduced-motion preferences, as requested.
+
+Asset-specific credits and source URLs are in `public/textures/credits.json`.
+NASA/JPL maps come from NASA's public 3D Resources collection; NASA Earth,
+night, cloud and Moon maps are distributed with Three.js examples. The page's
+Sources & Method dialog explains assumptions and links to NASA, ESA and JPL.
+All runtime assets are local; external references open only when followed.

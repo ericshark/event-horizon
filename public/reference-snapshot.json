@@ -1,0 +1,33 @@
+{
+  "epoch": "2026-10-29T00:00:00Z",
+  "method": "Low-precision published J2000 Kepler elements propagated by orbital period. Not JPL Horizons vectors. No live tracking.",
+  "source": "https://ssd.jpl.nasa.gov/planets/approx_pos.html",
+  "frame": "J2000 ecliptic, Earth-centred, kilometres",
+  "planets": {
+    "mercury": [-69562705.17677993, -80530395.75192176, -4286870.683282448],
+    "venus": [-36051681.250059634, -19276988.898439527, -4001163.778957145],
+    "earth": [0, 0, 0],
+    "mars": [-158570726.91783845, 148998471.07712358, 5843772.461085715],
+    "jupiter": [-667164539.5386771, 491687576.0059035, 9830761.048886986],
+    "saturn": [1258011673.9169464, 202630597.32736525, -59874569.0057765],
+    "uranus": [1199751584.618867, 2503127104.50874, -7513480.494789576],
+    "neptune": [4341769496.666273, 132917771.30275604, -107346035.68049082]
+  },
+  "stars": {
+    "proxima": {
+      "position": [
+        -14654373047144.883, -24500218637445.91, -28313959551365.793
+      ],
+      "distanceLy": 4.25
+    },
+    "gaiaBH1": {
+      "position": [-2010543652294878, -13473373582968942, 5678583559625642],
+      "distanceLy": 1560
+    }
+  },
+  "notes": [
+    "Stellar RA/Dec and distances are approximate catalogue references; not propagated through the journey’s elapsed light-equivalent time.",
+    "Moon position uses mean distance, not a dated orbital solution.",
+    "Voyager Earth distance propagated approximately from NASA 164.7 AU (2024-08-21) at 3.5 AU/year; direction is illustrative."
+  ]
+}
