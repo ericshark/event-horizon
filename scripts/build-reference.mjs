@@ -1,6 +1,13 @@
 // Node 22.18+ / Node 24: run `node scripts/build-reference.mjs`.
 import { writeFile } from 'node:fs/promises';
-import { planetPosition, sub, EPOCH, starPosition } from '../src/science.ts';
+import {
+  planetPosition,
+  sub,
+  EPOCH,
+  starPosition,
+  BH_MASS,
+  RS,
+} from '../src/science.ts';
 const earth = planetPosition('earth');
 const data = {
   epoch: EPOCH,
@@ -25,7 +32,14 @@ const data = {
       position: starPosition(217.429, -62.68, 4.25),
       distanceLy: 4.25,
     },
-    gaiaBH1: { position: starPosition(262.17, -0.58, 1560), distanceLy: 1560 },
+    sagittariusA: {
+      position: starPosition(266.4166667, -29.0077778, 26000),
+      distanceLy: 26000,
+      massKg: BH_MASS,
+      horizonRadiusKm: RS,
+      observationRadiusKm: 1000 * RS,
+      source: 'https://chandra.si.edu/photo/2026/sgrawind/index.html',
+    },
   },
   notes: [
     'Stellar RA/Dec and distances are approximate catalogue references; not propagated through the journey’s elapsed light-equivalent time.',

@@ -6,7 +6,7 @@ export const LY = C * YEAR;
 export const PARKER = (430000 * 1.609344) / 3600;
 export const G = 6.6743e-20;
 export const EARTH_RADIUS = 6371;
-export const BH_MASS = 9.62 * 1.98847e30;
+export const BH_MASS = 4e6 * 1.98847e30;
 export const RS = (2 * G * BH_MASS) / C ** 2;
 export type Vec = [number, number, number];
 export const norm = (v: Vec) => Math.hypot(...v);

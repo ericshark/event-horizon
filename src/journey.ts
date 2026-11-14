@@ -1,11 +1,11 @@
 import {
   AU,
   RS,
+  BH_MASS,
   planetPosition,
   starPosition,
   sub,
   norm,
-  mix,
   clamp,
   smooth,
   type Vec,
@@ -29,7 +29,7 @@ export interface Checkpoint {
 }
 const earth = planetPosition('earth');
 const planet = (id: string) => sub(planetPosition(id), earth);
-const bh = starPosition(262.17, -0.58, 1560);
+const bh = starPosition(266.4166667, -29.0077778, 26000);
 const direction = bh.map((v) => v / norm(bh)) as Vec;
 const radial = (au: number) => direction.map((v) => v * au * AU) as Vec;
 const make = (
@@ -67,8 +67,8 @@ export const CHECKPOINTS: Checkpoint[] = [
     'earth',
     'Earth',
     '01 / Our point of departure',
-    'How far away is the nearest black hole?',
-    'Start here. One blue world, a thin atmosphere, and everything we have ever called home. Scroll to leave Earth behind and follow a guided tour to Gaia BH1, the nearest confirmed black hole.',
+    'How far away is the heart of the Milky Way?',
+    'Start here. One blue world, a thin atmosphere, and everything we have ever called home. Scroll to leave Earth behind and follow a guided tour to Sagittarius A*, the black hole at our galaxy’s centre.',
     'A curated educational tour. Bodies are enlarged, detours are intentional, and time is compressed. This is not a straight-line flight or live tracking.',
     'planet',
     6371,
@@ -213,47 +213,9 @@ export const CHECKPOINTS: Checkpoint[] = [
     'neptune',
   ),
   make(
-    'kuiper',
-    'Kuiper Belt',
-    '11 / Beyond Neptune',
-    'The worlds we are still discovering.',
-    'The Kuiper Belt contains icy remnants from the solar system’s formation. Pluto is one of its best-known inhabitants, a dwarf planet about 0.19 times Earth’s diameter.',
-    'Main belt: roughly 30–50 AU from the Sun. Particle sizes and density are exaggerated for visibility.',
-    'field',
-    0,
-    0,
-    '#a5c9db',
-    radial(45),
-    undefined,
-    [
-      ['Region', '30–50 AU from Sun'],
-      ['Pluto diameter', '2,377 km'],
-      ['Population', 'Icy bodies · not a solid shell'],
-    ],
-  ),
-  make(
-    'heliopause',
-    'Heliopause',
-    '12 / A changing boundary',
-    'Where the solar wind gives way.',
-    'The Sun blows a bubble into the interstellar medium. At the heliopause, the outward solar wind meets pressure from the space between stars.',
-    'About 120 AU is a representative crossing distance. This boundary changes shape and does not mark the end of the Sun’s gravity.',
-    'field',
-    0,
-    0,
-    '#7ac9d0',
-    radial(120),
-    undefined,
-    [
-      ['Boundary', 'Solar wind / interstellar medium'],
-      ['Shape', 'Variable, asymmetric'],
-      ['Distance', '≈ 120 AU · representative'],
-    ],
-  ),
-  make(
     'voyager',
     'Voyager 1',
-    '13 / Humanity’s farthest messenger',
+    '11 / Humanity’s farthest messenger',
     'A little machine. An enormous journey.',
     'Launched in 1977, Voyager 1 became the first spacecraft to reach interstellar space. It has crossed the heliopause, but the distant Oort Cloud still lies ahead.',
     'Distance is an estimate propagated from NASA’s 164.7 AU Earth-distance reference on 2024-08-21 at 3.5 AU/year. Direction and spacecraft geometry are illustrative.',
@@ -271,29 +233,9 @@ export const CHECKPOINTS: Checkpoint[] = [
     ],
   ),
   make(
-    'oort',
-    'Oort Cloud',
-    '14 / The solar system’s distant reservoir',
-    'A cloud we have never photographed.',
-    'Long-period comets suggest a distant, roughly spherical reservoir of icy objects surrounding the Sun. We infer its existence; we have not directly mapped its members as a cloud.',
-    'Estimated inner edge: 2,000–5,000 AU. Outer estimates extend to 100,000 AU or more. This sparse shell is an explanatory illustration, not an observed image.',
-    'field',
-    0,
-    0,
-    '#c8bde2',
-    radial(50000),
-    undefined,
-    [
-      ['Inner boundary', '≈ 2,000–5,000 AU'],
-      ['Outer boundary', '≈ 100,000 AU · uncertain'],
-      ['Known', 'Comet orbits support a reservoir'],
-      ['Unknown', 'Population, shape, precise extent'],
-    ],
-  ),
-  make(
     'proxima',
     'Proxima Centauri',
-    '15 / Our nearest stellar neighbour',
+    '12 / Our nearest stellar neighbour',
     'The next sun is years away.',
     'At about 4.25 light-years, Proxima Centauri is the nearest star beyond the Sun. This small red dwarf is too faint to see with the naked eye. A planet, Proxima b, orbits close to it.',
     'This stop is another educational detour. The star is illustrated; no resolved surface photograph is available.',
@@ -309,113 +251,65 @@ export const CHECKPOINTS: Checkpoint[] = [
       ['Planet', 'Proxima b · not a resolved image'],
     ],
   ),
-  make(
-    'interstellar',
-    'Interstellar space',
-    '16 / The space between',
-    'Distance becomes the story.',
-    'Stars are islands in a very large ocean. Barnard’s Star is about 6 light-years from Earth; Sirius is about 8.6. Gaia BH1 lies much farther away, in the direction of Ophiuchus.',
-    'Those stars are distance comparisons, not additional flybys. The star field is illustrative, not a live navigational catalogue.',
-    'field',
-    0,
-    0,
-    '#9cb5dc',
-    mix(starPosition(217.429, -62.68, 4.25), bh, 0.45),
-    undefined,
-    [
-      ['Barnard’s Star', '≈ 6 ly from Earth'],
-      ['Sirius', '≈ 8.6 ly from Earth'],
-      ['Destination', '≈ 1,560 ly from Earth'],
-      ['Comparison speed', '1c · light-equivalent only'],
-    ],
-  ),
-  ...[
-    [
-      'gaia',
-      'Gaia BH1',
-      '17 / The nearest confirmed black hole',
-      'The invisible destination.',
-      'Gaia BH1 is about 9.62 times the mass of the Sun, paired with a Sun-like star. Its companion’s motion revealed the unseen mass. It is dormant: there is no bright accretion disk to illuminate this arrival.',
-      1000,
-    ],
-    [
-      'tides',
-      'Tidal approach',
-      '18 / A difference that matters',
-      'Gravity pulls unevenly.',
-      'The side of a body closer to the hole accelerates more strongly than the far side. Around this stellar-mass black hole, that difference becomes destructive well before the event horizon. The viewpoint now continues as a virtual camera.',
-      100,
-    ],
-    [
-      'photon',
-      'Photon sphere',
-      '19 / Light on a knife edge',
-      'Even light can orbit.',
-      'At 1.5 Schwarzschild radii, light can follow an unstable circular path. Background starlight bends into distorted arcs. A small change in direction decides whether a photon escapes or falls inward.',
-      1.5,
-    ],
-    [
-      'horizon',
-      'Event horizon',
-      '20 / The point of no return',
-      'A boundary, not a surface.',
-      'Once inside the event horizon, no future-directed signal can reach the outside universe. There is no solid shell to hit. The numerical boundary here belongs to a simplified, non-rotating black-hole model.',
-      1,
-    ],
-    [
-      'interior',
-      'Interior',
-      '21 / The journey ends here',
-      'Beyond the last return signal.',
-      'Our virtual camera has crossed the horizon. The darkness is a theoretical illustration, not a photograph of the interior. Classical relativity predicts an inward future; the full physics of the deepest interior remains unknown.',
-      0.8,
-    ],
-  ].map(([id, name, eyebrow, title, description, r]) => ({
+  {
     ...make(
-      String(id),
-      String(name),
-      String(eyebrow),
-      String(title),
-      String(description),
-      'Schwarzschild model; spin and the companion’s gravity are omitted. There is no stationary observer inside the horizon.',
-      id === 'interior' ? 'interior' : 'blackhole',
+      'sagittarius-a',
+      'Sagittarius A*',
+      '13 / The heart of the Milky Way',
+      'The invisible centre.',
+      'At the centre of our galaxy, Sagittarius A* contains roughly four million solar masses. Nearby stars and glowing gas reveal this otherwise invisible supermassive black hole.',
+      'Approximate J2000 RA 17h45m40s, Dec −29°00′28″; distance 26,000 ly. Nonrotating Schwarzschild model omits spin. The bright ring is an illustration, not a visible-light photograph. Observation remains at 1,000 horizon radii; descent is not available yet.',
+      'blackhole',
       RS,
-      9.62 * 1.98847e30,
+      BH_MASS,
       '#a8c7df',
       bh,
     ),
-    bhRadius: Number(r),
-    range: Math.max(0, (Number(r) - 1) * RS),
-  })),
+    bhRadius: 1000,
+    range: 999 * RS,
+  },
 ];
 CHECKPOINTS[0].range = 20000;
 CHECKPOINTS[4].range = 695700 * 9;
 CHECKPOINTS[7].range = CHECKPOINTS[7].radius * 5.8;
 /** Curve through safe observation positions; not a physically integrated trajectory. */
-const positions = CHECKPOINTS.map((p, i): Vec =>
-  i >= 16
+const positions = CHECKPOINTS.map((p): Vec =>
+  p.kind === 'blackhole'
     ? (bh.map((v, j) => v - direction[j] * (p.bhRadius ?? 1000) * RS) as Vec)
     : [p.position[0], p.position[1], p.position[2] + p.radius + p.range],
 );
-export function routePoint(segment: number, t: number): Vec {
+/** Segment-local kilometre origin prevents galactic-coordinate cancellation in arc length. */
+export const SCIENTIFIC_ORIGINS = positions;
+export function routeLocalPoint(segment: number, t: number): Vec {
   const a = positions[segment],
     b = positions[Math.min(segment + 1, positions.length - 1)];
-  const v = mix(a, b, clamp(t));
-  if (segment < 15)
-    v[2] +=
-      Math.sin(Math.PI * clamp(t)) *
-      Math.max(
-        norm(sub(a, b)) * 0.08,
-        segment === 3 || segment === 4 ? 7e6 : 0,
-      );
+  const delta = sub(b, a),
+    u = clamp(t);
+  const v = delta.map((n) => n * u) as Vec;
+  v[2] +=
+    (u === 0 || u === 1 ? 0 : Math.sin(Math.PI * u)) *
+    Math.max(
+      norm(delta) * 0.08,
+      CHECKPOINTS[segment].id === 'venus' || CHECKPOINTS[segment].id === 'sun'
+        ? 7e6
+        : 0,
+    );
   return v;
+}
+export function routePoint(segment: number, t: number): Vec {
+  if (t <= 0) return [...positions[segment]];
+  if (t >= 1)
+    return [...positions[Math.min(segment + 1, positions.length - 1)]];
+  return routeLocalPoint(segment, t).map(
+    (v, j) => positions[segment][j] + v,
+  ) as Vec;
 }
 const LENGTH_TABLES = positions.slice(1).map((_, i) => {
   let total = 0,
-    prev = routePoint(i, 0);
+    prev = routeLocalPoint(i, 0);
   const table = [0];
   for (let j = 1; j <= 256; j++) {
-    const next = routePoint(i, j / 256);
+    const next = routeLocalPoint(i, j / 256);
     total += norm(sub(next, prev));
     table.push(total);
     prev = next;
@@ -474,7 +368,7 @@ export function stateAt(index: number, local: number): JourneyState {
     routeKm,
     remainingKm: Math.max(0, TOTAL - routeKm),
     localRangeKm:
-      p.radius && i < 16
+      p.radius && p.kind !== 'blackhole'
         ? p.radius *
           (Math.hypot(
             Math.sin(t * Math.PI) * 4,
@@ -513,3 +407,103 @@ export const OBSERVATION_FACTS: Record<
     ],
   },
 };
+
+/** Authored seconds per adjacent connection; physical lengths remain independent. */
+export const LEG_DURATIONS = [6, 8, 10, 12, 14, 16, 18, 20, 22, 26, 34, 50];
+export const PLAYBACK_SECONDS = LEG_DURATIONS.reduce(
+  (sum, seconds) => sum + seconds,
+  0,
+);
+const LEGACY_STOPS: Record<string, string> = {
+  kuiper: 'voyager',
+  heliopause: 'voyager',
+  oort: 'proxima',
+  interstellar: 'sagittarius-a',
+  gaia: 'sagittarius-a',
+  'gaia-bh1': 'sagittarius-a',
+  blackhole: 'sagittarius-a',
+  tides: 'sagittarius-a',
+  photon: 'sagittarius-a',
+  horizon: 'sagittarius-a',
+  descent: 'sagittarius-a',
+  interior: 'sagittarius-a',
+};
+export function resolveStop(id: string): number {
+  const target = LEGACY_STOPS[id] ?? id;
+  return Math.max(
+    0,
+    CHECKPOINTS.findIndex((p) => p.id === target),
+  );
+}
+
+const additionalFacts: Record<string, [string, string][]> = {
+  mercury: [
+    ['Diameter', '4,879.4 km'],
+    ['Orbital period', '88 Earth days'],
+    ['Temperature', '−180 to 430 °C'],
+  ],
+  venus: [
+    ['Diameter', '12,103.6 km'],
+    ['Surface temperature', '≈ 467 °C'],
+    ['Atmosphere', 'Mostly carbon dioxide'],
+  ],
+  sun: [
+    ['Diameter', '1,391,400 km'],
+    ['Photosphere temperature', '≈ 5,500 °C'],
+    ['Solar system mass', '≈ 99.8%'],
+  ],
+  mars: [
+    ['Diameter', '6,779 km'],
+    ['Day length', '24.6 hours'],
+    ['Surface gravity', '3.71 m/s²'],
+  ],
+  jupiter: [
+    ['Diameter', '139,822 km · mean'],
+    ['Mass', '1.8982 × 10²⁷ kg'],
+    ['Great Red Spot', 'Storm larger than Earth'],
+  ],
+  saturn: [
+    ['Diameter', '116,464 km · mean'],
+    ['Rings', 'Countless pieces of ice and rock'],
+    ['Mean density', 'Less dense than water'],
+  ],
+  uranus: [
+    ['Diameter', '50,724 km · mean'],
+    ['Axial tilt', '≈ 98°'],
+    ['Orbital period', '84 Earth years'],
+  ],
+  neptune: [
+    ['Diameter', '49,244 km · mean'],
+    ['Orbital period', '165 Earth years'],
+    ['Winds', 'Over 2,000 km/h'],
+  ],
+  voyager: [
+    ['Launch', '5 September 1977'],
+    ['Estimated Earth distance', '≈ 172 AU · epoch 2026-10-29'],
+    ['Probe speed', '≈ 17 km/s · relative to Sun'],
+  ],
+  proxima: [
+    ['Earth distance', '≈ 4.25 light-years'],
+    ['Star type', 'Red dwarf'],
+    ['Diameter', '≈ 214,560 km · model'],
+  ],
+  'sagittarius-a': [
+    ['Earth distance', '≈ 26,000 light-years'],
+    ['Mass', '≈ 4 million solar masses'],
+    ['Horizon radius', `≈ ${(RS / 1e6).toFixed(1)} million km`],
+  ],
+};
+for (const p of CHECKPOINTS) {
+  if (!OBSERVATION_FACTS[p.id])
+    OBSERVATION_FACTS[p.id] = {
+      source:
+        p.id === 'sagittarius-a'
+          ? 'https://www.nasa.gov/image-article/supermassive-black-hole-sagittarius/'
+          : p.id === 'voyager'
+            ? 'https://science.nasa.gov/mission/voyager/voyager-1/'
+            : p.id === 'proxima'
+              ? 'https://science.nasa.gov/exoplanets/other-stars-other-worlds/our-nearest-celestial-neighbor-an-exotic-3-star-system/'
+              : `https://science.nasa.gov/${p.id}/facts/`,
+      facts: additionalFacts[p.id],
+    };
+}

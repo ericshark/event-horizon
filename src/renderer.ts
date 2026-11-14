@@ -3,7 +3,6 @@ import {
   BackSide,
   NoColorSpace,
   LineSegments,
-  WebGLRenderTarget,
   AmbientLight,
   BufferGeometry,
   Color,
@@ -13,13 +12,10 @@ import {
   DoubleSide,
   Float32BufferAttribute,
   Group,
-  Matrix3,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  OrthographicCamera,
   PerspectiveCamera,
-  PlaneGeometry,
   Points,
   PointsMaterial,
   RingGeometry,
@@ -29,12 +25,10 @@ import {
   SRGBColorSpace,
   Texture,
   TextureLoader,
-  Vector2,
   Vector3,
   WebGLRenderer,
   BoxGeometry,
 } from 'three';
-import { fragmentShader, vertexShader } from './blackhole.glsl';
 import { smooth } from './science';
 import { CHECKPOINTS } from './journey';
 import { SPACING, type FlightState } from './flight';
@@ -49,9 +43,6 @@ export class JourneyRenderer {
   private sun!: DirectionalLight;
   private body?: Mesh;
   private clouds?: Mesh;
-  private holeScene = new Scene();
-  private holeCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  private hole: ShaderMaterial;
   private nodes = new Map<
     number,
     { group: Group; body?: Mesh; clouds?: Mesh; field?: Points; proxy: Points }
@@ -59,9 +50,6 @@ export class JourneyRenderer {
   private warpField!: LineSegments;
   private warpMaterial!: ShaderMaterial;
   private background!: Mesh;
-  private holeTarget!: WebGLRenderTarget;
-  private overlayScene = new Scene();
-  private overlayMaterial!: MeshBasicMaterial;
   diagnostics = {
     loaded: [] as number[],
     warp: 0,
@@ -165,39 +153,6 @@ export class JourneyRenderer {
     this.warpField.frustumCulled = false;
     this.warpField.renderOrder = 10;
     this.scene.add(this.warpField);
-    this.holeTarget = new WebGLRenderTarget(1, 1, { depthBuffer: false });
-    this.overlayMaterial = new MeshBasicMaterial({
-      map: this.holeTarget.texture,
-      transparent: true,
-      opacity: 0,
-      depthTest: false,
-      depthWrite: false,
-    });
-    this.overlayScene.add(
-      new Mesh(new PlaneGeometry(2, 2), this.overlayMaterial),
-    );
-    this.hole = new ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      depthTest: false,
-      depthWrite: false,
-      uniforms: {
-        uResolution: { value: new Vector2() },
-        uTime: { value: 0 },
-        uCamPos: { value: new Vector3() },
-        uCamBasis: { value: new Matrix3() },
-        uTanHalfFov: { value: 0.4 },
-        uTitle: { value: null },
-        uTitleSize: { value: new Vector2(1, 1) },
-        uTitleOpacity: { value: 0 },
-        uLensPos: { value: new Vector3() },
-        uLensMass: { value: 0 },
-        uWhiteout: { value: 0 },
-        uInvert: { value: 0 },
-        uStepScale: { value: 1 },
-      },
-    });
-    this.holeScene.add(new Mesh(new PlaneGeometry(2, 2), this.hole));
     this.loadTexture('earth');
     this.loadTexture('night', 'png');
     this.loadTexture('clouds', 'png');
@@ -494,20 +449,18 @@ export class JourneyRenderer {
       height = innerHeight;
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75) * this.scale);
     this.renderer.setSize(width, height, false);
-    this.holeTarget.setSize(
-      Math.round(width * Math.min(devicePixelRatio, 1.75) * this.scale),
-      Math.round(height * Math.min(devicePixelRatio, 1.75) * this.scale),
-    );
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    this.hole.uniforms.uResolution.value.copy(
-      this.renderer.getDrawingBufferSize(new Vector2()),
-    );
   }
   render(s: FlightState, time: number) {
     const mobile = innerWidth < 760;
-    const leg = Math.min(16, Math.floor(s.position));
-    for (let i = Math.max(0, leg - 1); i <= Math.min(16, leg + 2); i++)
+    const originZ = s.now * SPACING;
+    const leg = Math.min(CHECKPOINTS.length - 1, Math.floor(s.position));
+    for (
+      let i = Math.max(0, leg - 1);
+      i <= Math.min(CHECKPOINTS.length - 1, leg + 2);
+      i++
+    )
       this.setCheckpoint(i);
     for (const [i, node] of this.nodes) {
       if (i < leg - 1 || i > leg + 2) {
@@ -525,11 +478,12 @@ export class JourneyRenderer {
     if (mobile) this.camera.fov = s.cameraPose ? 100 : 75;
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
-    this.camera.position.set(s.cameraX, 0, s.cameraZ);
-    this.camera.lookAt(s.cameraX, 0, s.cameraZ - 10);
+    this.camera.position.set(s.cameraX, 0, s.cameraZ - originZ);
+    this.camera.lookAt(s.cameraX, 0, s.cameraZ - originZ - 10);
     this.camera.rotation.y = -s.yaw;
     if (s.cameraPose) {
       this.camera.position.fromArray(s.cameraPose.position);
+      this.camera.position.z -= originZ;
       this.camera.quaternion.fromArray(s.cameraPose.rotation);
     }
     this.camera.setViewOffset(
@@ -543,19 +497,19 @@ export class JourneyRenderer {
     this.sky.position.copy(this.camera.position);
     this.background.position.copy(this.camera.position);
     this.background.rotation.y = 0.4 + time * 0.00004;
-    const handoff = smooth((s.position - 15.6) / 0.4);
+    const handoff = 0;
     (this.sky.material as PointsMaterial).opacity = 0.45 * (1 - handoff);
-    this.background.visible = s.position < 16;
+    this.background.visible = true;
     this.spinRate +=
       ((s.dragging ? 0 : 1) - this.spinRate) *
       (1 - Math.exp(-Math.max(0, time - this.spinTime) * 5));
     for (const [i, node] of this.nodes) {
-      node.group.position.set(0, 0, i * SPACING);
+      node.group.position.set(0, 0, i * SPACING - originZ);
       node.proxy.position.copy(node.group.position);
       const dz = Math.abs(i * SPACING - s.cameraZ),
         fade = 1 - smooth((dz - 45) / 45);
-      node.group.visible = fade > 0.001 && s.position < 16;
-      node.proxy.visible = fade < 0.999 && s.position < 16;
+      node.group.visible = fade > 0.001;
+      node.proxy.visible = fade < 0.999;
       (node.proxy.material as PointsMaterial).opacity =
         (1 - fade) * (1 - handoff);
       node.group.traverse((child) => {
@@ -589,7 +543,7 @@ export class JourneyRenderer {
     }
     this.spinTime = time;
     this.warpField.position.copy(this.camera.position);
-    this.warpField.visible = s.position > 0.1 && s.position < 16;
+    this.warpField.visible = s.position > 0.1;
     this.warpMaterial.uniforms.uWarp.value = s.warp;
     this.warpMaterial.uniforms.uTravel.value = s.position;
     this.warpMaterial.uniforms.uDirection.value = s.direction;
@@ -598,16 +552,18 @@ export class JourneyRenderer {
       3,
       s.position < 0.15 ? s.cameraZ + 10 : s.cameraZ - 10,
     );
-    this.sun.target.position.set(0, 0, leg * SPACING);
+    this.sun.target.position.set(0, 0, leg * SPACING - originZ);
     if (s.cameraPose) {
       this.sun.position.set(
         -4,
         3,
-        s.position * SPACING + 5 * (1 - 2 * s.position),
+        s.now * SPACING - originZ + (s.now === 0 ? 5 : -5),
       );
-      this.sun.target.position.set(0, 0, s.position * SPACING);
+      this.sun.target.position.set(0, 0, s.now * SPACING - originZ);
     }
-    const target = new Vector3(0, 0, s.next * SPACING).project(this.camera);
+    const target = new Vector3(0, 0, s.next * SPACING - originZ).project(
+      this.camera,
+    );
     this.diagnostics = {
       loaded: [...this.nodes.keys()],
       warp: s.warp,
@@ -626,48 +582,8 @@ export class JourneyRenderer {
           Math.abs(target.y) < 0.9,
       },
     };
-    if (s.position < 16) {
-      this.renderer.setClearColor('#020609');
-      this.renderer.render(this.scene, this.camera);
-    }
-    if (s.position > 15.6) {
-      const r = Math.max(1.001, s.bhRadius),
-        elev = 0.085;
-      const pos = new Vector3(0, Math.sin(elev) * r, Math.cos(elev) * r),
-        f = pos.clone().negate().normalize(),
-        right = new Vector3().crossVectors(f, new Vector3(0, 1, 0)).normalize(),
-        up = new Vector3().crossVectors(right, f);
-      const u = this.hole.uniforms;
-      u.uTime.value = time;
-      u.uCamPos.value.copy(pos);
-      u.uCamBasis.value.set(
-        right.x,
-        up.x,
-        f.x,
-        right.y,
-        up.y,
-        f.y,
-        right.z,
-        up.z,
-        f.z,
-      );
-      u.uTanHalfFov.value = mobile ? 0.8 : 0.5;
-      u.uStepScale.value = r < 4 ? 0.7 : 1;
-      if (s.bhRadius <= 1 && s.position >= 19) {
-        this.renderer.setClearColor('#010204');
-        this.renderer.clear();
-      } else if (s.position >= 16)
-        this.renderer.render(this.holeScene, this.holeCamera);
-      else {
-        this.renderer.setRenderTarget(this.holeTarget);
-        this.renderer.render(this.holeScene, this.holeCamera);
-        this.renderer.setRenderTarget(null);
-        this.overlayMaterial.opacity = handoff;
-        this.renderer.autoClear = false;
-        this.renderer.render(this.overlayScene, this.holeCamera);
-        this.renderer.autoClear = true;
-      }
-    }
+    this.renderer.setClearColor('#020609');
+    this.renderer.render(this.scene, this.camera);
     this.frames++;
     const now = performance.now(),
       dt = this.last ? now - this.last : 16;
@@ -696,11 +612,8 @@ export class JourneyRenderer {
     this.warpMaterial.dispose();
     this.background.geometry.dispose();
     (this.background.material as MeshBasicMaterial).dispose();
-    this.holeTarget.dispose();
-    this.overlayMaterial.dispose();
     this.sky.geometry.dispose();
     (this.sky.material as PointsMaterial).dispose();
-    this.hole.dispose();
     assets.forEach((t) => t.dispose());
     assets.clear();
     this.renderer.dispose();

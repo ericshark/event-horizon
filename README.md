@@ -1,9 +1,11 @@
 # Event Horizon — From Earth to the Unknown
 
-A continuous educational scroll journey from a rotating Earth to Gaia BH1,
-the nearest confirmed black hole. Twenty-one checkpoints visit the Moon, the
-other planets, the Sun, distant solar-system boundaries, Voyager 1, Proxima
-Centauri, and a dormant stellar-mass black hole before ending inside its horizon.
+An interactive educational journey from Earth to Sagittarius A*, with 13
+observation stops and 12 timed flights totalling 236 active seconds. Inspect
+worlds, travel forward or backward with Next/Previous or a deliberate wheel
+gesture, and pause or skip each flight. The picker and URL history open
+observations directly through a short fade. Old destination links redirect to
+the next retained stop; old black-hole stage links open the safe observation.
 
 ## Run and validate
 
@@ -14,128 +16,88 @@ npm ci
 npm run dev
 npm run typecheck
 npm run build
-PW_HEADLESS=true npm test -- --workers=1
+PW_HEADLESS=true npm test
 ```
 
-Browser tests use installed Chromium at `/usr/bin/chromium`; set
-`CHROMIUM_PATH` for another installation. Software WebGL is much slower than
-hardware and cannot establish real-GPU smoothness. Screenshots cover desktop
-and mobile Earth, departure, the Moon, Saturn, the Oort Cloud, the accretion
-approach, distance clustering and the interior.
+Tests use `/usr/bin/chromium` when present, otherwise Playwright's installed
+Chromium. Set `CHROMIUM_PATH` to override. If necessary, install with
+`npx playwright install chromium`. Verification is headless. Software WebGL
+cannot establish real-device GPU frame pacing.
 
-## Scientific model and reference data
+## Scientific model
 
-This is a curated tour with explicit detours, enlarged bodies and compressed
-presentation time. It is not a real spacecraft trajectory, live planetary map,
-or navigation tool. Every displayed speed identifies its reference frame.
+Science uses kilometres, kilograms and seconds, independently of local visual
+coordinates. Reference positions are fixed at **2026-10-29 00:00 UTC**. Published
+low-precision J2000 Kepler elements are propagated by orbital period, **not
+Horizons vectors**; secular perturbations are omitted. Moon coordinates use mean
+separation. Voyager's Earth distance is estimated from NASA's 164.7 AU baseline
+on 2024-08-21 at 3.5 AU/year; its direction is illustrative. Proxima and Sagittarius
+A* use approximate catalogue RA/Dec and distances held fixed throughout playback.
 
-`src/science.ts` keeps physical quantities in km, kg and seconds. It defines
-unit conversions, light/Parker-speed comparisons, an educational Newtonian
-tidal estimate across two metres, and low-precision orbital positions.
-`src/journey.ts` owns checkpoint content, curved-route sampling, cumulative path
-length, direct Earth displacement, and local camera range. Render units are
-independent of scientific units; each scene uses a local origin.
+Sagittarius A* uses approximately 4 million solar masses at 26,000 light-years,
+J2000 RA 17h45m40s, Dec −29°00′28″. The simplified nonrotating Schwarzschild model
+has a horizon radius of about 11.8 million km. The scientific observation point
+is offset from the centre by **1,000 horizon radii**. Optical framing is authored
+independently. The ring is illustrative; spin is omitted. Cinematic rendering
+and explicit horizon descent are assigned to EH-05 and are not yet available.
+Sources: [NASA mass and distance](https://www.nasa.gov/image-article/supermassive-black-hole-sagittarius/),
+[Chandra coordinates](https://chandra.si.edu/photo/2026/sgrawind/index.html).
 
-The reference date is **2026-10-29 00:00 UTC**. Direct access to JPL Horizons was
-blocked by the preparation environment's network policy. The delivered snapshot
-therefore explicitly uses published low-precision J2000 Kepler elements advanced
-by orbital period, **not Horizons vectors**. It does not include full secular
-perturbations. Moon coordinates use mean separation; Voyager's Earth-distance
-estimate is propagated from NASA's 164.7 AU baseline on 2024-08-21 at 3.5 AU/year,
-with an illustrative direction. Proxima/Gaia positions use approximate catalogue
-RA/Dec and distances, converted to the ecliptic frame and held fixed.
-
-Regenerate the documented snapshot with:
+Regenerate the reference snapshot:
 
 ```sh
 node scripts/build-reference.mjs
 ```
 
-The static file is `public/reference-snapshot.json`. The route bends away from
-celestial surfaces; it is not a gravitationally integrated flight. Distances
-include detours, so cumulative tour length is greater than the approximately
-1,560 ly direct Earth–Gaia BH1 separation. Light-equivalent elapsed time is
-route length/c, not proper time experienced by a human. Parker comparisons
-assume its record 430,000 mph can be held indefinitely and omit acceleration,
-fuel and braking. No actual spacecraft can reach 1c.
+The curved scientific path includes intentional detours and clears surfaces and
+Saturn's rings. Segment-local arc-length tables avoid subtracting galactic
+coordinates to calculate speed. Analytic speed integrates to each leg's length;
+reverse travel displays positive speed. Direct selections and skips settle at
+zero. Earth distance is straight-line displacement and can decrease on a
+detour. Instruments always retain miles, with AU above 0.1 AU and ly above 0.1 ly.
+Route distance includes detours; its light-equivalent time is length/c, not
+playback time or a traveller's proper time. Parker comparisons assume constant
+record speed without acceleration, braking or fuel limits. This is not a
+navigation-grade ephemeris or physically achievable spacecraft flight.
 
-Gaia BH1 uses 9.62 solar masses and a non-rotating Schwarzschild lens model.
-The original luminous accretion shader is restored as a cinematic illustration
-of an active black hole; Gaia BH1 is dormant. This distinction is visible in
-the pinned interface and explained in Sources and Details. Tidal gradients can become destructive before the
-horizon; survival thresholds are not claimed. Interior darkness is a theoretical
-illustration and the interface is narrative, not a return transmission. No
-physical signal or traveller can return after horizon crossing.
+## Architecture and controls
 
-## Continuous flight and interface
+- `science.ts`: units, physical constants, approximate reference positions.
+- `journey.ts`: catalog, sourced facts, durations, route sampling, legacy links.
+- `controller.ts`: monotonic active time, inspection, pause/resume/skip, immutable snapshots.
+- `flight.ts`: shared frame contract and proportional distance-rail grouping.
+- `renderer.ts`: one Three.js context, local scene origins, assets and camera application.
+- `main.ts`: semantic UI, navigation/history, input and snapshot-driven instruments.
 
-The interface uses JetBrains Mono throughout and presents only location, local
-range/next-destination distance, cumulative tour distance and light-equivalent
-time. Details retains mass, size comparisons, Parker benchmarks and source
-limitations. The final quote, summary and Return to Earth remain inside darkness.
+The complete route uses the timed controller; scroll position no longer owns
+playback. Hidden tabs return paused. Inspection changes neither scientific
+position nor route distance. Journey detail opens the truthful linear distance
+rail at rest, grouping nearby markers with a selectable linear inset. Transit
+retains instruments and playback controls; facts return during settling.
 
-`src/flight.ts` maps continuous scroll position into a 180-degree departure turn,
-continuous camera poses, safe flybys, physical telemetry, travel direction/rate,
-and the final pinned approach. Nearby groups persist across checkpoint boundaries;
-previous/next objects are only disposed once they leave the active neighbourhood.
-The authored local flight corridor is visually rescaled independently of physical
-reference positions. It does not imply that the planets form a straight line.
+## Rendering and verification
 
-The distance rail is linear in cumulative **tour distance**, including detours.
-Its domain expands toward each new destination; earlier checkpoints compress
-proportionally. Markers outside the current extent are not clamped onto a false
-position. Overlapping checkpoints form selectable groups with a local linear
-inset and exact checkpoint navigation. Reverse scrolling recomputes the same
-model without retaining stale future positions.
+Existing imagery and materials remain pending EH-03/EH-04. Earth uses NASA
+day/night imagery, normals, ocean highlights, separate clouds and an atmospheric
+rim. Asset provenance is in `public/textures/credits.json`. All runtime assets
+are bundled locally. Missing imagery uses illustrated materials; no-WebGL mode
+retains route, facts, timing, instruments and navigation. Comprehensive motion
+preferences and failure recovery belong to EH-06.
 
-Travel streaks use a separate GPU line field. Their length responds to a bounded
-logarithmic mapping of journey-distance changes over time and decays when scroll
-position stops. The effect represents compressed cinematic travel, not measured
-physical spacecraft speed or a relativistic simulation. The Earth-to-space turn
-holds physical distance until the camera has turned outward.
+Tests cover the exact itinerary and schedule, both directions on every leg,
+analytic speed integration, scientific path and camera clearance, safe galactic
+sampling, wheel ownership, pause/skip, inspection, direct/history/legacy links,
+maximum-width telemetry, responsive layout, source dialogs and fallback.
+See `docs/verification/eh-02.md` for acceptance evidence and limitations.
 
-## Rendering, assets and verification
-
-One Three.js WebGL context renders cached local celestial groups, a Hipparcos
-star-map background, depth-based travel lines, and the restored accretion ray
-marcher. A render-target blend hands the flight scene to the pinned black-hole
-sequence. The final camera direction stays fixed while radius decreases through
-the approach stages; the page has no whiteout, universe inversion or orbiting
-final camera. The bright disk is an educational cinematic illustration.
-
-Earth uses NASA day/night imagery, topographic normals, an ocean highlight mask,
-separate clouds and approximate cloud shadows, atmospheric rim scattering and
-23.44° axial tilt. Its visible rotation remains accelerated (one turn per 120
-seconds), and all physical statistics remain separately labeled. Legacy NASA
-giant-planet maps have limited resolution; they are not live weather or streamed
-Google Earth terrain. Saturn’s ring shadow, Mercury/Uranus materials, spacecraft
-geometry and distant populations are illustrative.
-
-Earth loads first and nearby destinations preload. Adaptive resolution changes
-render quality, not scientific measurements. Hidden tabs suspend rendering and
-reset travel velocity on resume. Missing textures retain illustrated materials;
-no-WebGL mode preserves descriptions, Details, checkpoint navigation and the
-ending. Full visual motion is independent of OS reduced-motion preferences.
-
-Asset provenance is in `public/textures/credits.json`. NASA/JPL maps come from
-NASA’s public 3D Resources collection; NASA Earth, normal, ocean-mask, night,
-cloud and Moon maps are distributed with Three.js examples. The distant sky uses
-NASA’s Hipparcos star map, while nearby travel particles are an illustrative
-depth field. All runtime assets are bundled locally.
-
-Tests cover camera continuity/clearance, direction and warp decay, proportional
-axis positions and clustering, persistent destination groups, all 21 checkpoints,
-reverse navigation, pinned UI, source dialogs, scientific calculations and fallback
-behaviour. Headless SwiftShader cannot establish real-GPU frame-rate smoothness.
-
-With the dev server running, record a short full-interface motion review using
-installed Chromium and ffmpeg:
+To record representative real-time Earth–Moon, Jupiter–Saturn and final
+Proxima–Sagittarius A* flights, start a verification server, then run:
 
 ```sh
 PREVIEW_URL=http://127.0.0.1:5174 node scripts/capture-flight.mjs
 ```
 
-The script saves `artifacts/motion/flight-review.webm`, covering Earth departure,
-a planet flyby and the accretion approach. It records rendered frames with
-timestamps; the software-rendered recording is a QA artifact, not a hardware
-performance benchmark.
+The capture script uses Playwright Chromium, saves
+`artifacts/motion/eh-02/flight-review.webm`, and closes its browser. Stop the
+verification server afterward. Recordings are software-rendered QA evidence,
+not a hardware performance benchmark.

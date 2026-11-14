@@ -144,13 +144,6 @@ summary:focus-visible {
   padding: 10px;
   color: #b0c3cf;
 }
-.flight-section {
-  height: 160svh;
-  pointer-events: none;
-}
-.flight-section:last-child {
-  height: 100svh;
-}
 .flight-panel {
   position: fixed;
   left: 4vw;
@@ -1060,7 +1053,7 @@ button:disabled {
 #speed-digits {
   display: inline-flex;
   justify-content: flex-end;
-  width: 21ch;
+  width: var(--speed-width, 27ch);
 }
 .digit,
 .separator {
@@ -1198,7 +1191,7 @@ select,
     font-size: 17px;
   }
   #speed-digits {
-    width: 21ch;
+    width: var(--speed-width, 27ch);
     justify-content: flex-start;
   }
   #timed-instruments small {
@@ -1296,9 +1289,24 @@ select,
     bottom: 15px;
   }
   .timed-journey #timed-navigation {
-    bottom: 130px;
+    bottom: 150px;
   }
-  #journey-detail {
-    display: none;
+  .timed-journey.journey-detail-open #rail {
+    left: 20px;
+    right: 20px;
+    bottom: 250px;
   }
+}
+
+/* Direct observation changes use a short, owned fade, never simulated speed. */
+#universe,
+#fallback {
+  transition: opacity 160ms ease;
+}
+.direct-navigation #universe,
+.direct-navigation #fallback {
+  opacity: 0;
+}
+body.timed-journey {
+  overflow: hidden;
 }

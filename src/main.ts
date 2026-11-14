@@ -1,18 +1,19 @@
 import '@fontsource-variable/jetbrains-mono/wght.css';
 import './styles.css';
-import Lenis from 'lenis';
 import { JourneyController, WheelIntent, type TimedFrame } from './controller';
 import { RollingDigits, mph, earthDistance } from './instruments';
 import { inspectionInput } from './inspection-input';
 import { gsap } from 'gsap';
-import { CHECKPOINTS, TOTAL, OBSERVATION_FACTS } from './journey';
 import {
-  flightAt,
-  TravelMotion,
-  distanceAxis,
-  CUMULATIVE,
-  type FlightState,
-} from './flight';
+  CHECKPOINTS,
+  TOTAL,
+  OBSERVATION_FACTS,
+  resolveStop,
+  PLAYBACK_SECONDS,
+  LEG_DURATIONS,
+  LEG_LENGTHS,
+} from './journey';
+import { distanceAxis, CUMULATIVE, type FlightState } from './flight';
 import {
   C,
   PARKER,
@@ -26,30 +27,33 @@ import {
 import { JourneyRenderer } from './renderer';
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
-const picker = $<HTMLSelectElement>('#checkpoints'),
-  main = $('#journey');
-for (const [i, p] of CHECKPOINTS.entries()) {
-  const el = document.createElement('section');
-  el.className = 'flight-section';
-  el.id = p.id;
-  el.dataset.checkpoint = String(i);
-  el.innerHTML = `<h2 class="sr-only">${p.name}</h2>`;
-  main.append(el);
+const picker = $<HTMLSelectElement>('#checkpoints');
+for (const [i, p] of CHECKPOINTS.entries())
   picker.add(new Option(`${String(i + 1).padStart(2, '0')} / ${p.name}`, p.id));
-}
-const sections = [...document.querySelectorAll<HTMLElement>('.flight-section')];
-const lenis = new Lenis({ lerp: 0.085, wheelMultiplier: 0.75 });
 const renderer = JourneyRenderer.create($<HTMLCanvasElement>('#universe'));
 document.documentElement.classList.add(renderer ? 'has-webgl' : 'no-webgl');
-const motion = new TravelMotion();
 const controller = new JourneyController(),
   wheel = new WheelIntent();
 const digits = new RollingDigits($('#speed-digits'));
-let timed = true;
-lenis.stop();
+const maximumMph = Math.max(
+  ...LEG_LENGTHS.map((length, i) => {
+    const seconds = LEG_DURATIONS[i];
+    return mph(
+      length /
+        (0.625 *
+          (seconds -
+            Math.min(2, 0.15 * seconds) -
+            Math.min(1.2, 0.12 * seconds))),
+    );
+  }),
+);
+document.documentElement.style.setProperty(
+  '--speed-width',
+  `${Math.ceil(maximumMph).toLocaleString('en-US').length}ch`,
+);
 const clearInspection = inspectionInput($('#inspection'), controller);
 
-let state: FlightState = flightAt(0),
+let state: TimedFrame = controller.snapshot(),
   time = 0,
   last = performance.now(),
   visible = !document.hidden,
@@ -59,27 +63,31 @@ let state: FlightState = flightAt(0),
 let axisModel = distanceAxis(0, 0);
 const number = (n: number) =>
   n.toLocaleString('en-US', { maximumFractionDigits: 0 });
-function go(id: string) {
-  const index = CHECKPOINTS.findIndex((p) => p.id === id);
-  if (index < 0) return;
-  timed = index <= 1;
+let navigationToken = 0;
+async function go(id: string, record = true, fade = true) {
+  const token = ++navigationToken;
   clearInspection();
   wheel.reset();
-  if (timed) {
-    controller.observe(index);
-    lenis.scrollTo(sections[index].offsetTop, { immediate: true, force: true });
-    lenis.stop();
-    state = controller.snapshot();
-    updateUI();
-  } else lenis.start();
-  const section = document.getElementById(id);
-  if (!section) return;
-  if (!timed) {
-    motion.reset();
-    lenis.scrollTo(section.offsetTop, { immediate: true, force: true });
-  }
-  history.replaceState(null, '', `#${id}`);
+  controller.pause(performance.now());
+  document.body.classList.toggle('direct-navigation', fade);
+  if (fade) await new Promise((resolve) => setTimeout(resolve, 160));
+  if (token !== navigationToken) return;
+  controller.observe(resolveStop(id));
+  state = controller.snapshot();
+  updateUI();
+  const hash = `#${CHECKPOINTS[state.now].id}`;
+  if (record && location.hash !== hash) history.pushState(null, '', hash);
+  else history.replaceState(null, '', hash);
+  document.body.classList.remove('direct-navigation');
 }
+window.addEventListener(
+  'hashchange',
+  () => void go(location.hash.slice(1), false),
+);
+window.addEventListener(
+  'popstate',
+  () => void go(location.hash.slice(1), false),
+);
 picker.addEventListener('change', () => go(picker.value));
 $('#begin').addEventListener('click', (event) => {
   event.preventDefault();
@@ -90,7 +98,7 @@ document.addEventListener('click', (e) => {
   const link = (e.target as HTMLElement).closest<HTMLAnchorElement>(
     'a[href^="#"]',
   );
-  if (link && CHECKPOINTS.some((p) => `#${p.id}` === link.hash)) {
+  if (link) {
     e.preventDefault();
     for (const d of document.querySelectorAll<HTMLDialogElement>(
       'dialog[open]',
@@ -102,14 +110,9 @@ document.addEventListener('click', (e) => {
 for (const id of ['sources', 'details', 'cluster']) {
   const d = $<HTMLDialogElement>(`#${id}`);
   $(`#${id}-close`).addEventListener('click', () => d.close());
-  d.addEventListener('close', () => {
-    if (!timed) lenis.start();
-  });
 }
 function openDialog(id: string) {
   $<HTMLDialogElement>(`#${id}`).showModal();
-  lenis.stop();
-  motion.reset();
 }
 $('#sources-open').addEventListener('click', () => openDialog('sources'));
 $('#details-open').addEventListener('click', () => {
@@ -121,15 +124,13 @@ function updateDetails() {
   $('#details-title').textContent = p.name;
   const metrics: [string, string][] = [
     ['Direct distance to Earth', distance(state.earthKm)],
-    [
-      'Light signal to Earth',
-      state.position >= 19
-        ? 'Cannot escape the horizon'
-        : duration(state.earthKm / C),
-    ],
+    ['Light signal to Earth', duration(state.earthKm / C)],
+    ['Route distance', distance(state.routeKm)],
+    ['Light-equivalent route time', duration(state.routeKm / C)],
+    ['Full forward playback', `${PLAYBACK_SECONDS} seconds`],
     ['At Parker’s record speed', duration(state.routeKm / PARKER)],
   ];
-  if (p.radius && state.position < 16)
+  if (p.radius && p.kind !== 'blackhole')
     metrics.unshift(
       ['Diameter', `${number(p.radius * 2)} km`],
       [
@@ -138,9 +139,9 @@ function updateDetails() {
       ],
       ['Mass', `${p.mass.toExponential(3)} kg`],
     );
-  if (state.position >= 16)
+  if (p.kind === 'blackhole')
     metrics.unshift(
-      ['Black-hole mass', '9.62 solar masses'],
+      ['Black-hole mass', '≈ 4 million solar masses'],
       ['Horizon radius', `${RS.toFixed(1)} km`],
       ['Virtual camera radius', `${state.bhRadius.toFixed(2)} rₛ`],
       [
@@ -149,7 +150,7 @@ function updateDetails() {
       ],
     );
   $('#details-content').innerHTML =
-    `<p>${p.description}</p><dl>${metrics.map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}${(p.facts ?? []).map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}</dl><p class="note">${p.note}</p><p class="note">Earth distance is straight-line displacement from Earth's center, rounded to the nearest mile in the instrument. Tour distance follows the authored route. Inspection changes neither value. Virtual speed is the route-distance derivative; ×c uses the same km/s. Earth and Moon facts: NASA Earth facts and Moon facts in Sources.${timed ? ` <a href="${OBSERVATION_FACTS[p.id].source}" target="_blank" rel="noreferrer">NASA · ${p.name} facts</a>` : ''}</p><p class="note">Distances and visibility are rescaled in the visuals. Warp streaks illustrate compressed travel, not an actual faster-than-light spacecraft. Reference positions are approximations, not Horizons vectors. Parker comparisons hold its record speed constant without acceleration or braking.</p>${state.position >= 16 ? '<p class="note">The bright disk is a cinematic illustration of an active black hole. Gaia BH1 is dormant. The fixed camera continues as an imaginary observer after destructive tides.</p>' : ''}`;
+    `<p>${p.description}</p><dl>${metrics.map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}${(p.facts ?? []).map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}</dl><p class="note">${p.note}</p><p class="note">Earth distance is straight-line displacement from Earth's center, rounded to the nearest mile in the instrument. Tour distance follows the authored route. Inspection changes neither value. Virtual speed is the route-distance derivative; ×c uses the same km/s. Facts and approximate model values: see the linked source and source limitations.${` <a href="${OBSERVATION_FACTS[p.id].source}" target="_blank" rel="noreferrer">NASA · ${p.name} reference</a>`}</p><p class="note">Distances and visibility are rescaled in the visuals. Warp streaks illustrate compressed travel, not an actual faster-than-light spacecraft. Reference positions are approximations, not Horizons vectors. Parker comparisons hold its record speed constant without acceleration or braking.</p>${p.kind === 'blackhole' ? '<p class="note">The bright ring is illustrative. Optical framing is independent of the scientific observation radius; spin and relativistic orbital evolution are omitted.</p>' : ''}`;
 }
 function openCluster(indices: number[]) {
   const points = indices.map((i) => CUMULATIVE[i]),
@@ -171,7 +172,9 @@ function openCluster(indices: number[]) {
 }
 function updateAxis() {
   const revealed =
-    state.position === 0 ? 0 : Math.min(20, Math.ceil(state.position));
+    state.position === 0
+      ? 0
+      : Math.min(CHECKPOINTS.length - 1, Math.ceil(state.position));
   const width = $('#axis-track').clientWidth;
   axisModel = distanceAxis(state.routeKm, revealed, width);
   const key = axisModel.groups.map((g) => g.indices.join(',')).join('|');
@@ -217,18 +220,10 @@ function updateAxis() {
     .join('');
 }
 function updateTimedUI() {
-  document.body.classList.toggle('timed-journey', timed);
-  for (const id of ['timed-instruments', 'timed-navigation', 'inspection'])
-    $(`#${id}`).hidden = !timed;
-  $('#playback-controls').hidden = true;
-  $('#observation-facts').hidden = !timed;
-  if (!timed) {
-    document.body.classList.remove('in-flight', 'settling');
-    $('.masthead').inert = false;
-    $('.flight-panel').inert = false;
-    $('#rail').inert = false;
-    return;
-  }
+  document.body.classList.add('timed-journey');
+  $('#observation-facts').hidden = false;
+  $('#timed-instruments').hidden = false;
+  $('#inspection').hidden = false;
   const s = state as TimedFrame,
     flying = s.playback !== 'observing';
   document.body.dataset.playback = s.playback;
@@ -243,10 +238,7 @@ function updateTimedUI() {
   $('#destination-marker').hidden = true;
   const observationIndex = s.flightPhase === 'settling' ? s.next : s.now;
   $('#location').textContent = CHECKPOINTS[observationIndex].name;
-  $('#description').textContent =
-    observationIndex === 0
-      ? 'One blue world, a thin atmosphere, and everything we have ever called home. Explore our planet, then turn outward toward the Moon.'
-      : CHECKPOINTS[1].description;
+  $('#description').textContent = CHECKPOINTS[observationIndex].description;
   $('#phase').textContent = flying
     ? `${s.playback === 'paused' ? 'PAUSED' : s.flightPhase.toUpperCase()} / TO ${CHECKPOINTS[s.next].name.toUpperCase()}`
     : `OBSERVING / ${CHECKPOINTS[s.now].name.toUpperCase()}`;
@@ -264,7 +256,11 @@ function updateTimedUI() {
       .join('');
   }
   $<HTMLButtonElement>('#previous').disabled = s.now === 0;
-  $('#next').textContent = s.now === 0 ? 'Next · Moon' : 'Next · Mercury';
+  $<HTMLButtonElement>('#next').disabled = s.now === CHECKPOINTS.length - 1;
+  $('#next').textContent =
+    s.now === CHECKPOINTS.length - 1
+      ? 'End of route'
+      : `Next · ${CHECKPOINTS[s.now + 1].name}`;
   $('#pause-flight').textContent = s.playback === 'paused' ? 'Resume' : 'Pause';
   $('#playback-label').textContent =
     s.playback === 'paused' ? 'Paused' : flying ? 'In flight' : 'At rest';
@@ -279,72 +275,23 @@ function updateTimedUI() {
   $('#light-speed').textContent = `${(s.speedKmS / C).toFixed(2)} ×c`;
 }
 function updateUI() {
-  const p = CHECKPOINTS[state.now],
-    next = CHECKPOINTS[state.next];
-  const isHole = state.position >= 16;
-  const localFlyby = state.phase === 'flyby' && p.radius > 0;
+  const p = CHECKPOINTS[state.now];
   document.body.dataset.checkpoint = p.id;
   document.body.dataset.phase = state.phase;
   document.documentElement.dataset.kind = p.kind;
   document.documentElement.style.setProperty('--accent', p.color);
   document.documentElement.style.setProperty('--fallback-color', p.color);
-  $('#phase').textContent =
-    state.phase === 'orbit'
-      ? 'NOW / EARTH ORBIT'
-      : state.phase === 'turn'
-        ? 'DEPARTURE / TURNING OUTWARD'
-        : state.phase === 'transit'
-          ? `IN TRANSIT / TO ${next.name.toUpperCase()}`
-          : state.phase === 'flyby'
-            ? `NOW / ${p.name.toUpperCase()} FLYBY`
-            : state.phase === 'interior'
-              ? 'BEYOND / THE EVENT HORIZON'
-              : 'GAIA BH1 / PINNED APPROACH';
-  $('#location').textContent = isHole
-    ? 'Gaia BH1'
-    : state.phase === 'transit'
-      ? next.name
-      : p.name;
-  $('#next-label').textContent = isHole
-    ? `STAGE / ${p.name.toUpperCase()}`
-    : `NOW ${p.name.toUpperCase()}  /  NEXT ${next.name.toUpperCase()}`;
+  $('#next-label').textContent = `OBSERVATION / ${p.name.toUpperCase()}`;
   $('#checkpoint-count').textContent =
-    `${String(state.now + 1).padStart(2, '0')} / 21`;
-  const target = state.phase === 'transit' ? next : p;
-  $('#description').textContent =
-    state.phase === 'orbit'
-      ? 'Our point of departure. Turn outward, then follow a 21-stop tour to the nearest confirmed black hole.'
-      : state.phase === 'turn'
-        ? 'Leaving home behind. Watch the Moon come into view as the camera turns outward.'
-        : target.description.split('. ')[0] +
-          (target.description.split('. ')[0].endsWith('.') ? '' : '.');
-  $('#range-label').textContent = isHole
-    ? 'DISTANCE TO THE HORIZON'
-    : state.position === 0
-      ? 'ALTITUDE ABOVE EARTH'
-      : localFlyby
-        ? `LOCAL RANGE / ${p.name.toUpperCase()}`
-        : `DISTANCE TO ${next.name.toUpperCase()}`;
-  const nextKm = Math.max(0, CUMULATIVE[state.next] - state.routeKm);
-  $('#range-value').textContent =
-    isHole && state.bhRadius <= 1
-      ? 'Inside · no return'
-      : distance(
-          isHole
-            ? state.rangeKm
-            : state.position === 0
-              ? 20000
-              : localFlyby
-                ? state.localRangeKm
-                : nextKm,
-        );
+    `${String(state.now + 1).padStart(2, '0')} / ${CHECKPOINTS.length}`;
+  $('#range-label').textContent = 'LOCAL OBSERVATION RANGE';
+  $('#range-value').textContent = distance(state.rangeKm);
   $('#route-value').textContent = distance(state.routeKm);
   $('#time-value').textContent = duration(state.routeKm / C);
-  $('#begin').hidden = state.position > 0.03;
-  $('#cinematic-note').hidden = !isHole;
-  $('#ending').hidden = state.position < 19.95;
+  $('#cinematic-note').hidden = p.kind !== 'blackhole';
+  $('#ending').hidden = true;
   $('#final-stats').textContent =
-    `${distance(TOTAL)} through 21 checkpoints. ${duration(travelTime(TOTAL))} at 1c; ${duration(travelTime(TOTAL, PARKER))} at Parker’s record speed.`;
+    `${distance(TOTAL)} through ${CHECKPOINTS.length} stops; ${PLAYBACK_SECONDS} seconds of playback. ${duration(travelTime(TOTAL))} light-equivalent route time.`;
   picker.value = p.id;
   if (selected !== state.now) {
     selected = state.now;
@@ -360,47 +307,20 @@ function updateUI() {
   updateAxis();
   updateTimedUI();
 }
-let anchors = sections.map((section) => section.offsetTop);
-function readPosition() {
-  let i = 0;
-  for (let j = anchors.length - 1; j >= 0; j--) {
-    if (scrollY + 0.5 >= anchors[j]) {
-      i = j;
-      break;
-    }
-  }
-  if (i >= 20) return 20;
-  return (
-    i +
-    Math.max(
-      0,
-      Math.min(1, (scrollY - anchors[i]) / (anchors[i + 1] - anchors[i])),
-    )
-  );
-}
 let lastPhase = '';
 function frame() {
   const now = performance.now(),
     dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   if (!visible) return;
-  if (!timed || controller.snapshot().playback !== 'paused') time += dt;
-  lenis.raf(now);
-  const q = readPosition();
-  if (!timed && q <= 1) go(q < 0.5 ? 'earth' : 'moon');
-  const base = flightAt(q);
-  const warp = motion.update(base.routeKm, dt);
-  const previousPlayback = timed ? (state as TimedFrame).playback : undefined;
-  state = timed ? controller.tick(now) : flightAt(q, warp, motion.direction);
-  if (
-    timed &&
-    previousPlayback &&
-    previousPlayback !== 'observing' &&
-    (state as TimedFrame).playback === 'observing'
-  ) {
-    history.replaceState(null, '', `#${CHECKPOINTS[state.now].id}`);
+  if (controller.snapshot().playback !== 'paused') time += dt;
+  const previousPlayback = state.playback;
+  state = controller.tick(now);
+  if (previousPlayback !== 'observing' && state.playback === 'observing') {
+    const hash = `#${CHECKPOINTS[state.now].id}`;
+    if (location.hash !== hash) history.pushState(null, '', hash);
     updateUI();
-    $('#next').focus();
+    $(state.now === CHECKPOINTS.length - 1 ? '#previous' : '#next').focus();
     $('#journey-announcement').textContent =
       `Arrived at ${CHECKPOINTS[state.now].name}.`;
   }
@@ -410,46 +330,29 @@ function frame() {
     uiAt = now;
     lastPhase = state.phase;
   }
-  const marker = $('#destination-marker'),
-    d = renderer?.diagnostics.target;
-  marker.hidden =
-    !d?.visible ||
-    state.position >= 16 ||
-    state.position < 0.12 ||
-    state.phase === 'flyby' ||
-    timed;
-  if (d) {
-    marker.style.left = `${d.x * 100}%`;
-    marker.style.top = `${d.y * 100}%`;
-    $('#destination-name').textContent = CHECKPOINTS[state.next].name;
-  }
 }
 gsap.ticker.add(frame);
 gsap.ticker.lagSmoothing(0);
 document.addEventListener('visibilitychange', () => {
-  if (timed && document.hidden) controller.pause(performance.now());
+  if (document.hidden) controller.pause(performance.now());
   visible = !document.hidden;
   clearInspection();
   wheel.reset();
   last = performance.now();
-  motion.reset();
   renderer?.resetTiming();
 });
 window.addEventListener('resize', () => {
-  anchors = sections.map((section) => section.offsetTop);
   renderer?.resize();
 });
 window.addEventListener(
   'pagehide',
   () => {
     gsap.ticker.remove(frame);
-    lenis.destroy();
     renderer?.dispose();
   },
   { once: true },
 );
-if (location.hash && CHECKPOINTS.some((p) => `#${p.id}` === location.hash))
-  requestAnimationFrame(() => go(location.hash.slice(1)));
+void go(location.hash.slice(1), false, false);
 state = controller.snapshot();
 updateUI();
 declare global {
@@ -474,16 +377,15 @@ window.__horizon = {
 };
 
 function launch(direction: number) {
-  if (!timed || document.querySelector('dialog[open]')) return;
+  if (
+    document.body.classList.contains('direct-navigation') ||
+    document.querySelector('dialog[open]')
+  )
+    return;
   const s = controller.snapshot();
   if (s.playback !== 'observing') return;
-  if (s.now === 1 && direction > 0) {
-    go('mercury');
-    return;
-  }
-  if (s.now === 0 && direction < 0) return;
   clearInspection();
-  if (controller.launch(performance.now())) {
+  if (controller.launch(performance.now(), direction)) {
     wheel.reset();
     state = controller.snapshot();
     updateUI();
@@ -513,7 +415,7 @@ $('#skip-flight').addEventListener('click', () => {
   wheel.reset();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && timed) {
+  if (e.key === 'Escape') {
     controller.pause(performance.now());
     state = controller.snapshot();
     updateUI();
@@ -522,7 +424,6 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener(
   'wheel',
   (e) => {
-    if (!timed) return;
     const excluded = (e.target as HTMLElement).closest(
       'button,select,a,input,textarea,[contenteditable],dialog',
     );

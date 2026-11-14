@@ -9,7 +9,7 @@ test('six active seconds, frame partition independence and analytic speed integr
     for (const dt of [1 / 60, 0.07, 0.4, 6]) {
       const c = new JourneyController();
       c.observe(direction === 1 ? 0 : 1);
-      c.launch(0);
+      c.launch(0, direction);
       for (let t = dt; t < 6 - 1e-8; t += dt) c.tick(t * 1000);
       const s = c.tick(6000);
       expect(s.playback).toBe('observing');
@@ -80,6 +80,7 @@ test('scientific arc length, conversions, reverse speed and Earth displacement m
     expect(earthDistance(km).miles).toContain('mi');
   expect(earthDistance(0.1 * AU - 1).context).toBe('');
   expect(earthDistance(0.1 * AU).context).toContain('AU');
+  expect(earthDistance(0.1 * LY - 1).context).toContain('AU');
   expect(earthDistance(0.1 * LY).context).toContain('ly');
 });
 test('camera is continuous and clears globes after arbitrary inspection and in reverse', () => {
@@ -91,7 +92,7 @@ test('camera is continuous and clears globes after arbitrary inspection and in r
         c.inspect(yaw, pitch);
         c.zoomBy(0.8);
         const initial = c.snapshot().cameraPose;
-        c.launch(0);
+        c.launch(0, stop === 0 ? 1 : -1);
         expect(c.snapshot().cameraPose).toEqual(initial);
         let previous = initial.position,
           minimum = Infinity,

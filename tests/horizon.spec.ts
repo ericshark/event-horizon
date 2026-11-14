@@ -1,207 +1,200 @@
-import { test, expect, type Page } from '@playwright/test';
-import { CHECKPOINTS } from '../src/journey';
-async function jump(page: Page, q: number) {
-  const index = Math.floor(q);
-  await page.locator('#checkpoints').selectOption(CHECKPOINTS[index].id);
-  await expect
-    .poll(() => page.evaluate(() => window.__horizon!.state().position))
-    .toBeCloseTo(index, 2);
-  if (Number.isInteger(q)) return;
-  await page.evaluate((q) => {
-    const stops = [
-      ...document.querySelectorAll<HTMLElement>('.flight-section'),
-    ];
-    const i = Math.min(20, Math.floor(q)),
-      start = stops[i].offsetTop,
-      span = (stops[i + 1]?.offsetTop ?? start) - start;
-    window.scrollTo(0, start + (q - i) * span);
-  }, q);
-  await expect
-    .poll(() => page.evaluate(() => window.__horizon!.state().position))
-    .toBeCloseTo(q, 2);
-}
-test('mono interface opens on Earth with observation facts and two live instruments', async ({
+import { test, expect } from '@playwright/test';
+import { CHECKPOINTS, LEG_DURATIONS } from '../src/journey';
+import {
+  collectErrors,
+  hasHorizontalOverflow,
+  screenshotContrast,
+} from './helpers';
+
+test('all stops through visible controls, timed forward/reverse flights, inspection and no descent', async ({
   page,
 }, info) => {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  const errors = collectErrors(page);
+  await page.clock.install();
   await page.goto('/');
-  await expect(page.locator('#location')).toHaveText('Earth');
-  await expect(page.locator('#range-value')).toHaveText('20,000 km');
-  await expect(page.locator('#observation-facts>div')).toHaveCount(3);
-  await expect(page.locator('#timed-instruments')).toBeVisible();
-  await expect(page.locator('.axis-marker')).toHaveCount(1);
-  expect(
-    await page
-      .locator('body')
-      .evaluate((el) => getComputedStyle(el).fontFamily),
-  ).toContain('JetBrains');
-  await expect
-    .poll(() => page.evaluate(() => window.__horizon!.frames()))
-    .toBeGreaterThan(2);
-  await page.screenshot({ path: `artifacts/${info.project.name}-earth.png` });
-  expect(errors).toEqual([]);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth > innerWidth,
-    ),
-  ).toBe(false);
-});
-test('turn, distant target, continuous encounters, and reverse navigation', async ({
-  page,
-}, info) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Next · Moon' }).click();
-  await page.getByRole('button', { name: 'Skip flight' }).click();
-  await expect(page.locator('#location')).toHaveText('Moon');
-  for (const q of [1, 3, 7, 12, 13, 16, 17.5, 18, 20]) {
-    await jump(page, q);
-    expect(
-      await page.evaluate(() =>
-        Number.isFinite(window.__horizon!.state().rangeKm),
-      ),
-    ).toBe(true);
-    if ([0.35, 0.75, 1, 7, 13, 17.5, 18, 20].includes(q))
+  await expect(page.locator('#checkpoints option')).toHaveCount(13);
+  await expect(
+    page.getByRole('button', { name: 'Previous', exact: true }),
+  ).toBeDisabled();
+  for (let i = 0; i < CHECKPOINTS.length; i++) {
+    await expect(page.locator('#location')).toHaveText(CHECKPOINTS[i].name);
+    await expect(page.locator('#checkpoint-count')).toHaveText(
+      `${String(i + 1).padStart(2, '0')} / 13`,
+    );
+    await expect(page.locator('#observation-facts > div')).toHaveCount(3);
+    await expect(page.locator('#speed-digits')).toHaveAttribute(
+      'data-value',
+      '0',
+    );
+    await expect(page).toHaveURL(new RegExp(`#${CHECKPOINTS[i].id}$`));
+    if ([0, 7, 10, 11, 12].includes(i)) {
+      await page.getByRole('region', { name: 'Inspect world' }).focus();
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('+');
+      await page.clock.runFor(100);
+      await page.getByRole('button', { name: 'Reset view' }).press('Enter');
       await page.screenshot({
-        path: `artifacts/${info.project.name}-flight-${q}.png`,
+        path: `artifacts/eh-02/${info.project.name}-${CHECKPOINTS[i].id}.png`,
+        animations: 'disabled',
       });
+    }
+    if (i < CHECKPOINTS.length - 1) {
+      await page
+        .getByRole('button', {
+          name: `Next · ${CHECKPOINTS[i + 1].name}`,
+          exact: true,
+        })
+        .press('Enter');
+      await page.clock.runFor(400);
+      await expect(page.locator('body')).toHaveClass(/in-flight/);
+      await expect(page.locator('.flight-panel')).toHaveAttribute('inert', '');
+      await expect(page.locator('#timed-instruments')).toBeVisible();
+      await page.clock.fastForward(LEG_DURATIONS[i] * 1000);
+      await page.clock.fastForward(600);
+    }
   }
-  await expect(page.locator('#ending')).toBeVisible();
-  await expect(page.locator('#ending')).toContainText(
-    'We can measure the distance.',
+  await expect(
+    page.getByRole('button', { name: 'End of route', exact: true }),
+  ).toBeDisabled();
+  await page.locator('#inspection').dispatchEvent('wheel', { deltaY: 200 });
+  await page.clock.fastForward(1000);
+  await expect(page.locator('body')).toHaveAttribute(
+    'data-playback',
+    'observing',
   );
-  await page.locator('#checkpoints').selectOption('moon');
-  await expect(page.locator('body')).toHaveAttribute('data-checkpoint', 'moon');
-  await page.locator('#checkpoints').selectOption('earth');
-  await expect(page.locator('#location')).toHaveText('Earth');
+  await expect(page.locator('#ending')).toBeHidden();
+  await page
+    .getByRole('button', { name: 'Details', exact: true })
+    .press('Enter');
+  await expect(page.locator('#details')).toContainText(
+    '4 million solar masses',
+  );
+  await expect(page.locator('#details')).toContainText('1000.00 rₛ');
+  await expect(page.locator('#details')).toContainText(
+    'Light-equivalent route time',
+  );
+  await page.keyboard.press('Escape');
+  for (let i = CHECKPOINTS.length - 1; i > 0; i--) {
+    await page
+      .getByRole('button', { name: 'Previous', exact: true })
+      .press('Enter');
+    await page.clock.fastForward(LEG_DURATIONS[i - 1] * 1000 + 100);
+    await page.clock.fastForward(600);
+    await expect(page.locator('#location')).toHaveText(CHECKPOINTS[i - 1].name);
+  }
+  expect(await hasHorizontalOverflow(page)).toBe(false);
+  expect(errors).toEqual([]);
 });
-test('all 21 destinations are accessible and details preserve science', async ({
+
+test('direct picker, hash redirects, invalid links, and history always settle with zero speed', async ({
   page,
 }) => {
-  await page.goto('/');
-  for (let i = 0; i < 21; i++) {
-    await jump(page, i);
+  const errors = collectErrors(page);
+  await page.goto('/#saturn');
+  await expect(page.locator('#location')).toHaveText('Saturn');
+  await page.locator('#checkpoints').selectOption('proxima');
+  await expect(page.locator('#location')).toHaveText('Proxima Centauri');
+  await page.goBack();
+  await expect(page.locator('#location')).toHaveText('Saturn');
+  await page.goForward();
+  await expect(page.locator('#location')).toHaveText('Proxima Centauri');
+  for (const [hash, name] of Object.entries({
+    kuiper: 'Voyager 1',
+    heliopause: 'Voyager 1',
+    oort: 'Proxima Centauri',
+    interstellar: 'Sagittarius A*',
+    gaia: 'Sagittarius A*',
+    tides: 'Sagittarius A*',
+    photon: 'Sagittarius A*',
+    horizon: 'Sagittarius A*',
+    interior: 'Sagittarius A*',
+    descent: 'Sagittarius A*',
+    unknown: 'Earth',
+  })) {
+    await page.evaluate((hash) => {
+      location.hash = hash;
+    }, hash);
+    await expect(page.locator('#location')).toHaveText(name);
     await expect(page.locator('body')).toHaveAttribute(
-      'data-checkpoint',
-      CHECKPOINTS[i].id,
+      'data-playback',
+      'observing',
     );
-    await expect(page.locator('#checkpoints')).toHaveValue(CHECKPOINTS[i].id);
+    await expect(page.locator('#speed-digits')).toHaveAttribute(
+      'data-value',
+      '0',
+    );
+    await expect(page.locator('#ending')).toBeHidden();
   }
-  await jump(page, 0);
-  await page.getByRole('button', { name: 'Details' }).click();
-  await expect(page.getByRole('dialog', { name: 'Earth' })).toContainText(
-    'Mass',
-  );
-  await expect(page.locator('#details')).toContainText('Parker');
-  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Sources', exact: true }).click();
   await expect(page.locator('#sources')).toContainText('not Horizons vectors');
-  await page.keyboard.press('Escape');
+  await expect(page.locator('#sources')).toContainText('11.8 million km');
+  expect(errors).toEqual([]);
 });
-test('warp follows travel and settles while paused; renderer retains nearby bodies', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await jump(page, 1);
-  await expect
-    .poll(() =>
-      page.evaluate(() => window.__horizon!.render()!.loaded.includes(2)),
-    )
-    .toBe(true);
-  const moonId = await page.evaluate(
-    () => window.__horizon!.render()!.nodeIds[2],
-  );
-  await jump(page, 2.01);
-  expect(
-    await page.evaluate(() => window.__horizon!.render()!.nodeIds[2]),
-  ).toBe(moonId);
-  expect(await page.evaluate(() => window.__horizon!.render()!.loaded)).toEqual(
-    expect.arrayContaining([1, 2, 3]),
-  );
-  for (let i = 0; i < 8; i++) {
-    await page.evaluate(() => window.scrollBy(0, 50));
-    await page.waitForTimeout(35);
-  }
-  await expect
-    .poll(() => page.evaluate(() => window.__horizon!.state().warp))
-    .toBeGreaterThan(0.01);
-  await expect
-    .poll(() => page.evaluate(() => window.__horizon!.state().warp), {
-      timeout: 6000,
-    })
-    .toBeLessThan(0.01);
-});
-test('linear rail compresses old checkpoints and cluster inset remains navigable', async ({
+
+test('maximum galactic speed and growing digits fit a fixed instrument width', async ({
   page,
 }, info) => {
-  await page.goto('/');
-  await jump(page, 15.8);
-  const axis = await page.evaluate(() => window.__horizon!.axis());
-  expect(axis.groups[0].indices.length).toBeGreaterThan(8);
+  await page.clock.install();
+  await page.goto('/#proxima');
+  const width = await page
+    .locator('#speed-digits')
+    .evaluate((el) => el.getBoundingClientRect().width);
+  await page
+    .getByRole('button', { name: 'Next · Sagittarius A*' })
+    .press('Enter');
+  await page.clock.fastForward(19000);
+  await page.getByRole('button', { name: 'Pause', exact: true }).press('Enter');
+  const value = await page.locator('#speed-digits').getAttribute('data-value');
+  expect(Number(value)).toBeGreaterThan(1e18);
+  expect(
+    await page
+      .locator('#speed-digits')
+      .evaluate((el) => el.getBoundingClientRect().width),
+  ).toBeCloseTo(width, 1);
+  const bounds = await page
+    .locator('#timed-instruments strong')
+    .first()
+    .boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(
+    page.viewportSize()!.width,
+  );
+  expect(
+    await page
+      .locator('#speed-digits')
+      .evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+  ).toBe(true);
+  expect(await hasHorizontalOverflow(page)).toBe(false);
+  await page.screenshot({
+    path: `artifacts/eh-02/${info.project.name}-maximum-speed.png`,
+  });
+  await page.getByRole('button', { name: 'Skip flight' }).press('Enter');
+  await page.clock.fastForward(600);
+  await expect(page.locator('#speed-digits')).toHaveAttribute(
+    'data-value',
+    '0',
+  );
+});
+
+test('distance rail retains selectable grouped markers at galactic scale', async ({
+  page,
+}) => {
+  await page.goto('/#sagittarius-a');
+  await page
+    .getByRole('button', { name: 'Journey detail', exact: true })
+    .click();
   await page.locator('.axis-marker').first().click();
   await expect(page.locator('#cluster')).toBeVisible();
   await expect(page.locator('#cluster-list')).toContainText('Earth');
-  await page.screenshot({
-    path: `artifacts/${info.project.name}-distance-cluster.png`,
-  });
   await page.locator('#cluster-list a[href="#earth"]').click();
   await expect(page.locator('#location')).toHaveText('Earth');
 });
-test('black-hole panel remains fixed through the inward zoom', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await jump(page, 16);
-  const start = await page.locator('.flight-panel').boundingBox();
-  const radius = await page.evaluate(() => window.__horizon!.state().bhRadius);
-  await jump(page, 18.5);
-  const end = await page.locator('.flight-panel').boundingBox();
-  expect(end!.x).toBe(start!.x);
-  expect(end!.y).toBe(start!.y);
-  expect(
-    await page.evaluate(() => window.__horizon!.state().bhRadius),
-  ).toBeLessThan(radius);
-  await expect(page.locator('#cinematic-note')).toBeVisible();
-  await jump(page, 20);
-  await expect(page.locator('#range-value')).toHaveText('Inside · no return');
-});
-test('motion remains enabled under OS preference, and hidden tabs pause and resume', async ({
-  page,
-}) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
-  await expect
-    .poll(() => page.evaluate(() => window.__horizon!.frames()))
-    .toBeGreaterThan(2);
-  await page.evaluate(() => {
-    Object.defineProperty(document, 'hidden', {
-      configurable: true,
-      get: () => true,
-    });
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
-  const stopped = await page.evaluate(() => window.__horizon!.frames());
-  await page.waitForTimeout(200);
-  expect(await page.evaluate(() => window.__horizon!.frames())).toBe(stopped);
-  await page.evaluate(() => {
-    Object.defineProperty(document, 'hidden', {
-      configurable: true,
-      get: () => false,
-    });
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
-  await expect
-    .poll(() => page.evaluate(() => window.__horizon!.frames()))
-    .toBeGreaterThan(stopped);
-});
-test('failed imagery and no-WebGL retain the journey and ending', async ({
+
+test('failed imagery and no-WebGL preserve navigation, facts and safe final observation', async ({
   page,
 }) => {
   await page.route('**/textures/*', (route) => route.abort());
   await page.goto('/');
-  await expect
-    .poll(() => page.evaluate(() => window.__horizon!.textureFailures()))
-    .toBeGreaterThan(0);
   await expect(page.locator('#render-status')).toContainText(
     'illustrated surfaces',
   );
@@ -219,36 +212,35 @@ test('failed imagery and no-WebGL retain the journey and ending', async ({
   });
   await page.reload();
   await expect(page.locator('html')).toHaveClass(/no-webgl/);
-  await jump(page, 20);
-  await expect(page.locator('#ending')).toBeVisible();
+  await page.locator('#checkpoints').selectOption('sagittarius-a');
+  await expect(page.locator('#location')).toHaveText('Sagittarius A*');
+  await expect(page.locator('#observation-facts > div')).toHaveCount(3);
+  await expect(page.locator('#ending')).toBeHidden();
 });
 
-test('checkpoint jumps remain exact with fractional section heights', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 846 });
-  await page.goto('/');
-  for (const id of ['moon', 'saturn', 'earth']) {
-    await page.locator('#checkpoints').selectOption(id);
-    await expect(page.locator('body')).toHaveAttribute('data-checkpoint', id);
-  }
-});
-
-test('region and spacecraft metrics use physical route distance', async ({
+test('short viewport, scene contrast and real-time outer-planet flight', async ({
   page,
 }, info) => {
-  await page.goto('/');
-  await jump(page, 12);
-  await expect(page.locator('#range-label')).toHaveText(
-    'DISTANCE TO OORT CLOUD',
-  );
-  await expect(page.locator('#range-value')).toHaveText(/(AU|ly)/);
-  await jump(page, 13);
-  await expect(page.locator('#range-label')).toHaveText(
-    'DISTANCE TO PROXIMA CENTAURI',
-  );
-  await expect(page.locator('#range-value')).toHaveText(/ly/);
+  const errors = collectErrors(page);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto('/#jupiter');
+  await expect(page.locator('#location')).toHaveText('Jupiter');
+  await expect
+    .poll(async () =>
+      screenshotContrast(page, await page.locator('#universe').screenshot()),
+    )
+    .toBeGreaterThan(5);
   await page.screenshot({
-    path: `artifacts/${info.project.name}-flight-13.png`,
+    path: `artifacts/eh-02/${info.project.name}-short-jupiter.png`,
   });
+  await page.getByRole('button', { name: 'Next · Saturn' }).click();
+  await expect(page.locator('.flight-panel')).toHaveCSS('opacity', '0');
+  await expect(page.locator('body')).toHaveAttribute(
+    'data-playback',
+    'observing',
+    { timeout: 25000 },
+  );
+  await expect(page.locator('#location')).toHaveText('Saturn');
+  expect(await hasHorizontalOverflow(page)).toBe(false);
+  expect(errors).toEqual([]);
 });

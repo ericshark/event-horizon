@@ -1,4 +1,5 @@
-import { defineConfig } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { chromium, defineConfig } from '@playwright/test';
 
 const port = Number(process.env.PW_PORT || 5201);
 
@@ -15,7 +16,11 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     // Headless Chromium has no GPU; SwiftShader provides a software WebGL implementation.
     launchOptions: {
-      executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
+      executablePath:
+        process.env.CHROMIUM_PATH ||
+        (existsSync('/usr/bin/chromium')
+          ? '/usr/bin/chromium'
+          : chromium.executablePath()),
       args: [
         '--use-angle=swiftshader',
         '--enable-unsafe-swiftshader',

@@ -30,10 +30,12 @@ test('intentional wheel starts one flight; momentum, modifiers, dialogs and touc
   );
   await page.clock.runFor(350);
   await wheel(-80, { deltaMode: 1 });
-  await page.getByRole('button', { name: 'Skip flight' }).click();
+  await page.getByRole('button', { name: 'Skip flight' }).press('Enter');
   await page.clock.runFor(100);
   await expect(page.locator('#location')).toHaveText('Earth');
-  await page.getByRole('button', { name: 'Details', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Details', exact: true })
+    .press('Enter');
   await page.locator('#details').dispatchEvent('wheel', { deltaY: 300 });
   await page.clock.runFor(1000);
   await expect(page.locator('body')).toHaveAttribute(
@@ -104,7 +106,9 @@ test('pointer drag/pinch, resizing, hidden-tab pause and native keyboard activat
   });
   await page.clock.runFor(100);
   await expect(page.locator('body')).toHaveAttribute('data-playback', 'paused');
-  await page.getByRole('button', { name: 'Resume', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Resume', exact: true })
+    .press('Enter');
   await page.clock.runFor(4000);
   await expect(page.locator('#location')).toHaveText('Moon');
   expect(await hasHorizontalOverflow(page)).toBe(false);
