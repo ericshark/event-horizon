@@ -47,6 +47,9 @@ import {
 } from './planet-materials';
 
 const assets = new Map<string, Texture>();
+/** World-space directions towards the Sun for the Earth stop and every later stop. */
+const SUN_FROM_FRONT = new Vector3(-4, 3, 5).normalize();
+const SUN_FROM_BEHIND = new Vector3(-4, 3, -5).normalize();
 export class JourneyRenderer {
   private renderer: WebGLRenderer;
   private scene = new Scene();
@@ -293,7 +296,7 @@ export class JourneyRenderer {
         });
       }
       this.body = new Mesh(new SphereGeometry(1, 128, 64), mat);
-      this.body.rotation.y = ((p.id.length * 1.7) % 6) as number;
+      this.body.rotation.y = (p.id.length * 1.7) % 6; // varies the initial longitude per world
       if (p.id === 'earth') {
         this.clouds = new Mesh(
           new SphereGeometry(1.012, 96, 48),
@@ -568,7 +571,7 @@ export class JourneyRenderer {
     for (const [i, node] of this.nodes) {
       node.group.position.set(0, 0, i * SPACING - originZ);
       node.proxy.position.copy(node.group.position);
-      const toSun = new Vector3(-4, 3, i === 0 ? 5 : -5).normalize();
+      const toSun = i === 0 ? SUN_FROM_FRONT : SUN_FROM_BEHIND;
       for (const child of node.group.children) {
         if (child instanceof Mesh && child.material instanceof ShaderMaterial) {
           const u = child.material.uniforms;
