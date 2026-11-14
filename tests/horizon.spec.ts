@@ -1,6 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import { CHECKPOINTS } from '../src/journey';
 async function jump(page: Page, q: number) {
+  const index = Math.floor(q);
+  await page.locator('#checkpoints').selectOption(CHECKPOINTS[index].id);
+  await expect
+    .poll(() => page.evaluate(() => window.__horizon!.state().position))
+    .toBeCloseTo(index, 2);
+  if (Number.isInteger(q)) return;
   await page.evaluate((q) => {
     const stops = [
       ...document.querySelectorAll<HTMLElement>('.flight-section'),
@@ -14,7 +20,7 @@ async function jump(page: Page, q: number) {
     .poll(() => page.evaluate(() => window.__horizon!.state().position))
     .toBeCloseTo(q, 2);
 }
-test('mono interface opens on Earth with only three primary metrics', async ({
+test('mono interface opens on Earth with observation facts and two live instruments', async ({
   page,
 }, info) => {
   const errors: string[] = [];
@@ -22,7 +28,8 @@ test('mono interface opens on Earth with only three primary metrics', async ({
   await page.goto('/');
   await expect(page.locator('#location')).toHaveText('Earth');
   await expect(page.locator('#range-value')).toHaveText('20,000 km');
-  await expect(page.locator('.readouts>div')).toHaveCount(3);
+  await expect(page.locator('#observation-facts>div')).toHaveCount(3);
+  await expect(page.locator('#timed-instruments')).toBeVisible();
   await expect(page.locator('.axis-marker')).toHaveCount(1);
   expect(
     await page
@@ -44,14 +51,10 @@ test('turn, distant target, continuous encounters, and reverse navigation', asyn
   page,
 }, info) => {
   await page.goto('/');
-  await jump(page, 0.14);
-  expect(
-    await page.evaluate(() => window.__horizon!.render()!.yaw),
-  ).toBeGreaterThan(3);
-  await jump(page, 0.2);
-  await expect(page.locator('#destination-marker')).toBeVisible();
-  await expect(page.locator('#destination-name')).toHaveText('Moon');
-  for (const q of [0.35, 0.75, 1, 3, 7, 12, 13, 16, 17.5, 18, 20]) {
+  await page.getByRole('button', { name: 'Next · Moon' }).click();
+  await page.getByRole('button', { name: 'Skip flight' }).click();
+  await expect(page.locator('#location')).toHaveText('Moon');
+  for (const q of [1, 3, 7, 12, 13, 16, 17.5, 18, 20]) {
     await jump(page, q);
     expect(
       await page.evaluate(() =>
@@ -99,21 +102,21 @@ test('warp follows travel and settles while paused; renderer retains nearby bodi
   page,
 }) => {
   await page.goto('/');
-  await jump(page, 0.8);
+  await jump(page, 1);
   await expect
     .poll(() =>
-      page.evaluate(() => window.__horizon!.render()!.loaded.includes(1)),
+      page.evaluate(() => window.__horizon!.render()!.loaded.includes(2)),
     )
     .toBe(true);
   const moonId = await page.evaluate(
-    () => window.__horizon!.render()!.nodeIds[1],
+    () => window.__horizon!.render()!.nodeIds[2],
   );
-  await jump(page, 1.01);
+  await jump(page, 2.01);
   expect(
-    await page.evaluate(() => window.__horizon!.render()!.nodeIds[1]),
+    await page.evaluate(() => window.__horizon!.render()!.nodeIds[2]),
   ).toBe(moonId);
   expect(await page.evaluate(() => window.__horizon!.render()!.loaded)).toEqual(
-    expect.arrayContaining([0, 1, 2]),
+    expect.arrayContaining([1, 2, 3]),
   );
   for (let i = 0; i < 8; i++) {
     await page.evaluate(() => window.scrollBy(0, 50));

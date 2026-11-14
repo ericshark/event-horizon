@@ -9,6 +9,8 @@ import {
 import { clamp, smooth, norm, RS } from './science';
 export const SPACING = 120;
 export interface FlightState extends JourneyState {
+  cameraPose?: import('./controller').CameraPose;
+  dragging?: boolean;
   position: number;
   leg: number;
   legProgress: number;

@@ -955,3 +955,350 @@ dialog dd {
     margin-top: 5px;
   }
 }
+
+/* Timed observation slice: the worlds lead; navigation and instruments stay quiet. */
+.timed-journey .readouts {
+  display: none;
+}
+.timed-journey .flight-panel {
+  top: 23vh;
+  width: 350px;
+}
+.timed-journey #description {
+  min-height: 0;
+}
+.timed-journey .flight-panel h1 {
+  letter-spacing: -0.035em;
+}
+.timed-journey #phase {
+  display: none;
+}
+#observation-facts {
+  margin: 28px 0 0;
+  display: grid;
+  gap: 17px;
+}
+#observation-facts dt {
+  font-size: 10px;
+  color: #9bacb8;
+}
+#observation-facts dd {
+  margin: 5px 0 0;
+  font-size: 14px;
+}
+#inspection {
+  position: fixed;
+  inset: 12vh 0 25vh 38vw;
+  z-index: 2;
+  touch-action: none;
+  cursor: grab;
+}
+#inspection:active {
+  cursor: grabbing;
+}
+#inspection:focus-visible {
+  outline: 1px solid #91d3e7;
+  outline-offset: -12px;
+}
+#timed-navigation {
+  position: fixed;
+  z-index: 5;
+  right: 4vw;
+  bottom: 190px;
+  text-align: right;
+}
+#timed-navigation button,
+#playback-controls button {
+  background: #07131bcc;
+  border: 1px solid #577480;
+  padding: 10px 14px;
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 11px;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+#timed-navigation button:hover:enabled,
+#playback-controls button:hover {
+  background: #17303e;
+}
+#inspection-hint {
+  color: #a9bcc8;
+  font-size: 10px;
+  margin: 14px 0 0;
+}
+.mobile-hint {
+  display: none;
+}
+#timed-instruments {
+  position: fixed;
+  z-index: 6;
+  left: 4vw;
+  bottom: 145px;
+  display: grid;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+#timed-instruments > div > span {
+  display: block;
+  color: #a9bcc8;
+  font-size: 10px;
+  margin-bottom: 7px;
+}
+#timed-instruments strong {
+  display: block;
+  font-size: clamp(18px, 2vw, 28px);
+  font-weight: 400;
+  white-space: nowrap;
+}
+#timed-instruments small {
+  color: #a9bcc8;
+  font-size: 10px;
+}
+#speed-digits {
+  display: inline-flex;
+  justify-content: flex-end;
+  width: 21ch;
+}
+.digit,
+.separator {
+  height: 1.3em;
+  display: inline-block;
+  overflow: hidden;
+}
+.digit {
+  width: 1ch;
+}
+.digit > span {
+  display: flex;
+  flex-direction: column;
+}
+.digit i {
+  height: 1.3em;
+  font-style: normal;
+  line-height: 1.3;
+}
+#playback-label {
+  font-size: 10px;
+  color: #a9bcc8;
+}
+#playback-controls {
+  position: fixed;
+  z-index: 7;
+  right: 4vw;
+  bottom: 145px;
+  display: flex;
+  gap: 10px;
+}
+.timed-journey .masthead,
+.timed-journey .flight-panel,
+.timed-journey #rail {
+  transition: opacity 350ms ease;
+}
+.timed-journey.in-flight .masthead,
+.timed-journey.in-flight .flight-panel,
+.timed-journey.in-flight #rail {
+  opacity: 0;
+  pointer-events: none;
+}
+.timed-journey.in-flight.settling .masthead,
+.timed-journey.in-flight.settling .flight-panel {
+  opacity: 1;
+  transition-duration: 500ms;
+}
+.timed-journey .panel-actions {
+  margin-top: 20px;
+}
+button,
+select,
+.dialog-top button {
+  min-height: 44px;
+}
+::selection {
+  background: #295369;
+  color: #fff;
+}
+@media (max-width: 759px) {
+  .timed-journey .flight-panel {
+    top: 44svh;
+    bottom: auto;
+    left: 20px;
+    right: 20px;
+    width: auto;
+  }
+  .timed-journey .flight-panel h1 {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+  .timed-journey .next-line {
+    display: none;
+  }
+  .timed-journey #description {
+    margin: 10px 0;
+    line-height: 1.65;
+  }
+  #observation-facts {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin: 14px 0 0;
+  }
+  #observation-facts dt {
+    font-size: 8px;
+  }
+  #observation-facts dd {
+    font-size: 10px;
+    line-height: 1.6;
+  }
+  .timed-journey .panel-actions {
+    position: absolute;
+    right: 0;
+    top: -10px;
+    margin: 0;
+  }
+  #inspection {
+    inset: 105px 0 56svh;
+  }
+  #timed-navigation {
+    left: 20px;
+    right: 20px;
+    bottom: 125px;
+    text-align: left;
+  }
+  #timed-navigation button {
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+  #inspection-hint {
+    font-size: 8px;
+    margin-top: 8px;
+  }
+  .desktop-hint {
+    display: none;
+  }
+  .mobile-hint {
+    display: inline;
+  }
+  #timed-instruments {
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  #timed-instruments > div:first-child {
+    grid-column: 1 / -1;
+  }
+  #timed-instruments > div > span {
+    font-size: 8px;
+    margin-bottom: 3px;
+  }
+  #timed-instruments strong {
+    font-size: 17px;
+  }
+  #speed-digits {
+    width: 21ch;
+    justify-content: flex-start;
+  }
+  #timed-instruments small {
+    font-size: 8px;
+  }
+  #playback-label {
+    text-align: right;
+    align-self: end;
+    font-size: 9px;
+  }
+  #playback-controls {
+    bottom: 185px;
+    right: 20px;
+  }
+  .timed-journey #rail {
+    display: none;
+  }
+  .timed-journey .render-status {
+    bottom: auto;
+    top: 102px;
+    max-width: 230px;
+  }
+}
+@media (max-height: 800px) and (min-width: 760px) {
+  .timed-journey .flight-panel {
+    top: 16vh;
+  }
+  .timed-journey #description {
+    margin: 12px 0;
+  }
+  #observation-facts {
+    gap: 10px;
+    margin-top: 16px;
+  }
+  #timed-instruments {
+    bottom: 110px;
+  }
+  #timed-navigation {
+    bottom: 140px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .digit {
+    filter: none !important;
+  }
+}
+.timed-journey .flight-panel {
+  top: 19vh;
+}
+.timed-journey #timed-instruments {
+  bottom: 45px;
+}
+.timed-journey #timed-navigation {
+  bottom: 30px;
+}
+.timed-journey #rail {
+  display: none;
+}
+.timed-journey.journey-detail-open #rail {
+  display: block;
+  left: 45vw;
+  bottom: 115px;
+  padding: 20px;
+  background: #08131cf5;
+}
+@media (min-width: 760px) and (max-height: 800px) {
+  .timed-journey .flight-panel {
+    top: 14vh;
+  }
+  .timed-journey #timed-instruments {
+    bottom: 25px;
+    gap: 8px;
+  }
+  .timed-journey #timed-navigation {
+    bottom: 25px;
+  }
+  .timed-journey #description {
+    font-size: 11px;
+  }
+  .timed-journey #observation-facts {
+    gap: 8px;
+  }
+  .timed-journey #observation-facts dd {
+    font-size: 12px;
+  }
+  .timed-journey .panel-actions {
+    margin-top: 14px;
+  }
+}
+@media (max-width: 759px) {
+  .timed-journey .flight-panel {
+    top: 44svh;
+  }
+  .timed-journey #timed-instruments {
+    bottom: 15px;
+  }
+  .timed-journey #timed-navigation {
+    bottom: 130px;
+  }
+  #journey-detail {
+    display: none;
+  }
+}

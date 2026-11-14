@@ -50,6 +50,7 @@
         ><span id="checkpoint-count">01 / 21</span>
       </div>
       <p id="description"></p>
+      <dl id="observation-facts" hidden></dl>
       <div class="readouts" aria-label="Primary journey metrics">
         <div>
           <span id="range-label">ALTITUDE ABOVE EARTH</span
@@ -75,6 +76,57 @@
         Cinematic accretion disk · Gaia BH1 is dormant.
       </p>
     </aside>
+    <section id="timed-instruments" aria-label="Travel instruments" hidden>
+      <div>
+        <span>Virtual travel speed</span
+        ><strong
+          ><span id="speed-digits" aria-hidden="true"></span>
+          <small>mph</small></strong
+        ><small id="light-speed"></small>
+      </div>
+      <div>
+        <span>Earth distance</span><strong id="earth-miles"></strong
+        ><small id="earth-context"></small>
+      </div>
+      <span id="playback-label"></span>
+    </section>
+    <div
+      id="inspection"
+      role="region"
+      tabindex="0"
+      aria-label="Inspect world"
+      aria-describedby="inspection-hint"
+      hidden
+    ></div>
+    <div id="timed-navigation" hidden>
+      <button id="previous" type="button">Previous</button
+      ><button id="next" type="button">Next</button>
+      <button id="zoom-in" type="button" aria-label="Zoom in">+</button
+      ><button id="zoom-out" type="button" aria-label="Zoom out">−</button
+      ><button id="reset-view" type="button">Reset view</button
+      ><button
+        id="journey-detail"
+        type="button"
+        aria-expanded="false"
+        aria-controls="rail"
+      >
+        Journey detail
+      </button>
+      <p id="inspection-hint">
+        <span class="desktop-hint">Drag to explore · Scroll to travel</span
+        ><span class="mobile-hint">Drag to explore · Pinch to zoom</span>
+      </p>
+    </div>
+    <div id="playback-controls" hidden>
+      <button id="pause-flight" type="button">Pause</button
+      ><button id="skip-flight" type="button">Skip flight</button>
+    </div>
+    <p
+      id="journey-announcement"
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+    ></p>
     <div id="destination-marker" aria-hidden="true">
       <i></i><span id="destination-name"></span>
     </div>
@@ -215,6 +267,11 @@
           target="_blank"
           rel="noreferrer"
           >NASA · Earth facts</a
+        ><a
+          href="https://science.nasa.gov/moon/facts/"
+          target="_blank"
+          rel="noreferrer"
+          >NASA · Moon facts</a
         ><a
           href="https://science.nasa.gov/solar-system/"
           target="_blank"

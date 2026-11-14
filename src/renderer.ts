@@ -72,6 +72,8 @@ export class JourneyRenderer {
   };
   private scale = 0.85;
   private last = 0;
+  private spinTime = 0;
+  private spinRate = 1;
   private slow = 0;
   private loader = new TextureLoader();
   private field?: Points;
@@ -517,18 +519,24 @@ export class JourneyRenderer {
         this.nodes.delete(i);
       }
     }
-    this.camera.fov = 36 + 24 * smooth(s.position / 0.15);
-    if (mobile) this.camera.fov = 75;
+    this.camera.fov = s.cameraPose
+      ? 40 + s.warp * 8
+      : 36 + 24 * smooth(s.position / 0.15);
+    if (mobile) this.camera.fov = s.cameraPose ? 100 : 75;
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
     this.camera.position.set(s.cameraX, 0, s.cameraZ);
     this.camera.lookAt(s.cameraX, 0, s.cameraZ - 10);
     this.camera.rotation.y = -s.yaw;
+    if (s.cameraPose) {
+      this.camera.position.fromArray(s.cameraPose.position);
+      this.camera.quaternion.fromArray(s.cameraPose.rotation);
+    }
     this.camera.setViewOffset(
       innerWidth,
       innerHeight,
       mobile ? 0 : -innerWidth * 0.1,
-      mobile ? innerHeight * 0.23 : 0,
+      mobile ? innerHeight * (s.cameraPose ? 0.24 : 0.23) : 0,
       innerWidth,
       innerHeight,
     );
@@ -538,6 +546,9 @@ export class JourneyRenderer {
     const handoff = smooth((s.position - 15.6) / 0.4);
     (this.sky.material as PointsMaterial).opacity = 0.45 * (1 - handoff);
     this.background.visible = s.position < 16;
+    this.spinRate +=
+      ((s.dragging ? 0 : 1) - this.spinRate) *
+      (1 - Math.exp(-Math.max(0, time - this.spinTime) * 5));
     for (const [i, node] of this.nodes) {
       node.group.position.set(0, 0, i * SPACING);
       node.proxy.position.copy(node.group.position);
@@ -559,7 +570,14 @@ export class JourneyRenderer {
         }
       });
       if (node.body) {
-        node.body.rotation.y = (time * Math.PI * 2) / 120;
+        // Integrate local spin so releasing a drag cannot jump to a wall-clock angle.
+        if (!s.dragging)
+          node.body.rotation.y +=
+            (Math.min(0.05, Math.max(0, time - this.spinTime)) *
+              Math.PI *
+              2 *
+              this.spinRate) /
+            120;
         if (
           node.body.material instanceof ShaderMaterial &&
           node.body.material.uniforms.time
@@ -569,6 +587,7 @@ export class JourneyRenderer {
       if (node.clouds) node.clouds.rotation.y = (time * Math.PI * 2) / 140;
       if (node.field) node.field.rotation.y = time * 0.008;
     }
+    this.spinTime = time;
     this.warpField.position.copy(this.camera.position);
     this.warpField.visible = s.position > 0.1 && s.position < 16;
     this.warpMaterial.uniforms.uWarp.value = s.warp;
@@ -580,6 +599,14 @@ export class JourneyRenderer {
       s.position < 0.15 ? s.cameraZ + 10 : s.cameraZ - 10,
     );
     this.sun.target.position.set(0, 0, leg * SPACING);
+    if (s.cameraPose) {
+      this.sun.position.set(
+        -4,
+        3,
+        s.position * SPACING + 5 * (1 - 2 * s.position),
+      );
+      this.sun.target.position.set(0, 0, s.position * SPACING);
+    }
     const target = new Vector3(0, 0, s.next * SPACING).project(this.camera);
     this.diagnostics = {
       loaded: [...this.nodes.keys()],

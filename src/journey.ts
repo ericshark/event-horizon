@@ -423,6 +423,22 @@ const LENGTH_TABLES = positions.slice(1).map((_, i) => {
   return table;
 });
 export const LEG_LENGTHS = LENGTH_TABLES.map((table) => table.at(-1)!);
+/** Invert the shared arc-length table so timed playback has the promised speed. */
+export function pointAtDistance(segment: number, fraction: number): Vec {
+  const table = LENGTH_TABLES[segment],
+    length = table.at(-1)! * clamp(fraction);
+  let lo = 0,
+    hi = 256;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (table[mid] < length) lo = mid;
+    else hi = mid;
+  }
+  const t =
+    (lo + (length - table[lo]) / Math.max(1e-20, table[hi] - table[lo])) / 256;
+  return routePoint(segment, t);
+}
+
 function partialLength(i: number, t: number) {
   const table = LENGTH_TABLES[i];
   if (!table) return 0;
@@ -474,3 +490,26 @@ export function stateAt(index: number, local: number): JourneyState {
       ((next.bhRadius ?? 1000) - (p.bhRadius ?? 1000)) * t,
   };
 }
+
+/** Curated resting facts for the timed slice; keep source ownership with the catalog. */
+export const OBSERVATION_FACTS: Record<
+  string,
+  { source: string; facts: [string, string][] }
+> = {
+  earth: {
+    source: 'https://science.nasa.gov/earth/facts/',
+    facts: [
+      ['Diameter', '12,742 km'],
+      ['Day length', '23 h 56 m · sidereal'],
+      ['Atmosphere', '78% nitrogen · 21% oxygen'],
+    ],
+  },
+  moon: {
+    source: 'https://science.nasa.gov/moon/facts/',
+    facts: [
+      ['Diameter', '3,474.8 km'],
+      ['Mean Earth separation', '384,400 km'],
+      ['Surface gravity', '1.62 m/s²'],
+    ],
+  },
+};
