@@ -77,6 +77,21 @@ export function schedule(elapsed: number, duration = 6) {
               : 'braking',
   } as const;
 }
+/** Per-leg [lift, sideways] swing in render units: Earth–Moon stays local, later legs sweep wider. */
+const ARCS: [number, number][] = [
+  [7, 2],
+  [14, -6],
+  [18, 8],
+  [12, -10],
+  [20, 5],
+  [16, -8],
+  [22, 9],
+  [18, -5],
+  [24, 7],
+  [14, -9],
+  [20, 6],
+  [18, -7],
+];
 function facing(position: Vec, target: Vec) {
   return new Quaternion().setFromRotationMatrix(
     new Matrix4().lookAt(
@@ -90,8 +105,9 @@ function pose(position: Vec, target: Vec): CameraPose {
   return { position, rotation: facing(position, target).toArray() };
 }
 function viewingRadius(stop: number) {
-  return CHECKPOINTS[stop].id === 'saturn' ||
-    CHECKPOINTS[stop].kind === 'blackhole'
+  // Saturn: rings (outer radius 2.3) stay inside the frame at maximum zoom and any pitch.
+  if (CHECKPOINTS[stop].id === 'saturn') return 8.4;
+  return CHECKPOINTS[stop].kind === 'blackhole'
     ? 7
     : CHECKPOINTS[stop].kind === 'probe'
       ? 6
@@ -242,8 +258,12 @@ export class JourneyController {
           : u > 0.85
             ? mix(b, this.end.position, quintic((u - 0.85) / 0.15))
             : mix(a, b, quintic((u - 0.15) / 0.7));
-      if (u >= 0.15 && u <= 0.85)
-        p[1] += 18 * Math.sin((Math.PI * (u - 0.15)) / 0.7) ** 2;
+      if (u >= 0.15 && u <= 0.85) {
+        const swell = Math.sin((Math.PI * (u - 0.15)) / 0.7) ** 2,
+          arc = ARCS[leg % ARCS.length];
+        p[1] += arc[0] * swell;
+        p[0] += arc[1] * swell;
+      }
       const rotation =
         timing.phase === 'departure'
           ? startFacing.slerp(

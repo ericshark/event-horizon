@@ -9,6 +9,7 @@ import {
 test('all stops through visible controls, timed forward/reverse flights, inspection and no descent', async ({
   page,
 }, info) => {
+  test.setTimeout(240000); // software WebGL renders every resident planet
   const errors = collectErrors(page);
   await page.clock.install();
   await page.goto('/');

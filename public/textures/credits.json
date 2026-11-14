@@ -5,36 +5,6 @@
     "source": "https://github.com/mrdoob/three.js/blob/dev/examples/textures/planets/earth_day_4096.jpg"
   },
   {
-    "file": "moon.jpg",
-    "credit": "NASA imagery distributed with the Three.js examples",
-    "source": "https://github.com/mrdoob/three.js/blob/dev/examples/textures/planets/moon_1024.jpg"
-  },
-  {
-    "file": "venus.jpg",
-    "credit": "NASA / JPL \u2014 NASA 3D Resources",
-    "source": "https://github.com/nasa/NASA-3D-Resources/blob/master/Images%20and%20Textures/Venus/Venus.jpg"
-  },
-  {
-    "file": "mars.jpg",
-    "credit": "NASA / JPL \u2014 NASA 3D Resources",
-    "source": "https://github.com/nasa/NASA-3D-Resources/blob/master/Images%20and%20Textures/Mars/Mars.jpg"
-  },
-  {
-    "file": "jupiter.jpg",
-    "credit": "NASA / JPL \u2014 NASA 3D Resources",
-    "source": "https://github.com/nasa/NASA-3D-Resources/blob/master/Images%20and%20Textures/Jupiter/Jupiter.jpg"
-  },
-  {
-    "file": "saturn.jpg",
-    "credit": "NASA / JPL \u2014 NASA 3D Resources",
-    "source": "https://github.com/nasa/NASA-3D-Resources/blob/master/Images%20and%20Textures/Saturn/Saturn.jpg"
-  },
-  {
-    "file": "neptune.jpg",
-    "credit": "NASA / JPL \u2014 NASA 3D Resources",
-    "source": "https://github.com/nasa/NASA-3D-Resources/blob/master/Images%20and%20Textures/Neptune/Neptune.jpg"
-  },
-  {
     "file": "clouds.png",
     "credit": "NASA imagery distributed with Three.js examples",
     "source": "https://github.com/mrdoob/three.js/tree/dev/examples/textures/planets"
@@ -58,5 +28,75 @@
     "file": "earth-specular.jpg",
     "credit": "NASA imagery distributed with the Three.js examples",
     "source": "https://github.com/mrdoob/three.js/blob/dev/examples/textures/planets/earth_specular_2048.jpg"
+  },
+  {
+    "file": "moon.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/moon",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Downscaled from 8192x4096 to 4096x2048, JPEG q0.86; also used as a bump map."
+  },
+  {
+    "file": "mars.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/mars",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Downscaled to 4096x2048, JPEG q0.86; also used as a bump map."
+  },
+  {
+    "file": "mercury.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/mercury",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Downscaled to 4096x2048, JPEG q0.86; also used as a bump map."
+  },
+  {
+    "file": "sun.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/sun",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Downscaled to 4096x2048; animated and limb-darkened in a shader."
+  },
+  {
+    "file": "venus.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/venus",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Used unmodified (4096x2048 cloud-deck map, not radar terrain)."
+  },
+  {
+    "file": "jupiter.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/jupiter",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Used unmodified (4096x2048)."
+  },
+  {
+    "file": "saturn.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/saturn",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Used unmodified (4096x2048)."
+  },
+  {
+    "file": "uranus.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/uranus",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Used unmodified (2048x1024)."
+  },
+  {
+    "file": "neptune.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/neptune",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Used unmodified (2048x1024)."
+  },
+  {
+    "file": "saturn-rings.png",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/saturn-rings",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Used unmodified; radial strip mapped to ring radius 1.2\u20132.3 body radii."
   }
 ]

@@ -4,6 +4,7 @@ import { hasHorizontalOverflow } from './helpers';
 test('intentional wheel starts one flight; momentum, modifiers, dialogs and touch do not queue flights', async ({
   page,
 }) => {
+  test.setTimeout(240000); // software WebGL renders every resident planet
   await page.clock.install();
   await page.goto('/');
   const wheel = async (deltaY: number, extra = {}) =>

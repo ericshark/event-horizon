@@ -5,13 +5,14 @@ import {
   LineSegments,
   AmbientLight,
   BufferGeometry,
-  Color,
   ConeGeometry,
   CylinderGeometry,
   DirectionalLight,
   DoubleSide,
   Float32BufferAttribute,
   Group,
+  Material,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -32,6 +33,18 @@ import {
 import { smooth } from './science';
 import { CHECKPOINTS } from './journey';
 import { SPACING, type FlightState } from './flight';
+import { ASSETS, residentAssets, residentStops } from './assets';
+import {
+  RING_INNER,
+  RING_OUTER,
+  cloudShellMaterial,
+  earthMaterial,
+  ringMaterial,
+  rimMaterial,
+  saturnBodyMaterial,
+  setRimUnlit,
+  sunMaterial,
+} from './planet-materials';
 
 const assets = new Map<string, Texture>();
 export class JourneyRenderer {
@@ -43,9 +56,18 @@ export class JourneyRenderer {
   private sun!: DirectionalLight;
   private body?: Mesh;
   private clouds?: Mesh;
+  private ring?: Mesh;
+  private scratch = new Matrix4();
   private nodes = new Map<
     number,
-    { group: Group; body?: Mesh; clouds?: Mesh; field?: Points; proxy: Points }
+    {
+      group: Group;
+      body?: Mesh;
+      clouds?: Mesh;
+      ring?: Mesh;
+      field?: Points;
+      proxy: Points;
+    }
   >();
   private warpField!: LineSegments;
   private warpMaterial!: ShaderMaterial;
@@ -53,6 +75,7 @@ export class JourneyRenderer {
   diagnostics = {
     loaded: [] as number[],
     warp: 0,
+    pending: 0,
     camera: [0, 0, 0] as number[],
     yaw: 0,
     nodeIds: {} as Record<number, string>,
@@ -67,6 +90,8 @@ export class JourneyRenderer {
   private field?: Points;
   frames = 0;
   textureFailures = 0;
+  /** Textures requested but not yet decoded; acceptance checks wait for zero. */
+  pendingTextures = 0;
   private constructor(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext) {
     this.renderer = new WebGLRenderer({
       canvas,
@@ -154,8 +179,6 @@ export class JourneyRenderer {
     this.warpField.renderOrder = 10;
     this.scene.add(this.warpField);
     this.loadTexture('earth');
-    this.loadTexture('night', 'png');
-    this.loadTexture('clouds', 'png');
     this.resize();
   }
   static create(canvas: HTMLCanvasElement) {
@@ -169,36 +192,53 @@ export class JourneyRenderer {
       return null;
     }
   }
-  private loadTexture(name: string, ext = 'jpg') {
+  private loadTexture(name: string) {
     if (assets.has(name)) return assets.get(name)!;
+    const spec = ASSETS[name];
+    this.pendingTextures++;
     const texture = this.loader.load(
-      `/textures/${name}.${ext}`,
+      `/textures/${name}.${spec.ext}`,
       () => {
+        this.pendingTextures--;
         document.documentElement.dataset.textures = 'ready';
       },
       undefined,
       () => {
+        this.pendingTextures--;
+        // Reserved for load failures: a flat placeholder keeps the scene alive.
         this.textureFailures++;
         document.documentElement.dataset.textureFallback = 'true';
         const fallback = document.createElement('canvas');
         fallback.width = 4;
         fallback.height = 2;
         const ctx = fallback.getContext('2d')!;
-        ctx.fillStyle =
-          name === 'earth'
-            ? '#27618e'
-            : name === 'night'
-              ? '#000000'
-              : '#b1b9bb';
+        ctx.fillStyle = spec.fallback;
         ctx.fillRect(0, 0, 4, 2);
         (texture.source as { data: unknown }).data = fallback;
         texture.needsUpdate = true;
       },
     );
-    texture.colorSpace =
-      name === 'earth-normal' ? NoColorSpace : SRGBColorSpace;
+    texture.colorSpace = spec.linear ? NoColorSpace : SRGBColorSpace;
+    texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     assets.set(name, texture);
     return texture;
+  }
+  /** Dispose textures no resident stop needs; shared ones survive. */
+  private releaseUnusedTextures(leg: number) {
+    const keep = residentAssets(leg);
+    for (const [name, texture] of assets)
+      if (!keep.has(name)) {
+        texture.dispose();
+        assets.delete(name);
+      }
+  }
+  /** Adaptive-quality hook (EH-06): scales the render resolution without touching flight state. */
+  setQuality(scale: number) {
+    this.scale = Math.max(0.35, Math.min(1, scale));
+    this.resize();
+  }
+  get quality() {
+    return this.scale;
   }
   private clear() {
     this.object.traverse((child) => {
@@ -213,6 +253,7 @@ export class JourneyRenderer {
     this.object.clear();
     this.body = undefined;
     this.clouds = undefined;
+    this.ring = undefined;
     this.field = undefined;
   }
   private setCheckpoint(index: number) {
@@ -220,82 +261,94 @@ export class JourneyRenderer {
     this.object = new Group();
     this.body = undefined;
     this.clouds = undefined;
+    this.ring = undefined;
     this.field = undefined;
     this.scene.add(this.object);
     const p = CHECKPOINTS[index];
     if (p.kind === 'planet' || p.kind === 'star') {
-      const mat = new MeshStandardMaterial({
-        color: p.texture ? '#ffffff' : p.color,
-        roughness: 0.95,
-        map: p.texture ? this.loadTexture(p.texture) : null,
-      });
-      if (p.kind === 'star') {
-        mat.emissive = new Color(p.color);
-        mat.emissiveIntensity = 1.4;
-      }
-      this.body = new Mesh(new SphereGeometry(1, 80, 48), mat);
+      const tex = (name: string) => this.loadTexture(name);
+      let mat: Material;
       if (p.id === 'earth') {
-        const earth = new ShaderMaterial({
-          uniforms: {
-            day: { value: this.loadTexture('earth') },
-            night: { value: this.loadTexture('night', 'png') },
-            normalMap: { value: this.loadTexture('earth-normal') },
-            oceanMap: { value: this.loadTexture('earth-specular') },
-            time: { value: 0 },
-            clouds: { value: this.loadTexture('clouds', 'png') },
-          },
-          vertexShader: `varying vec2 vUv;varying vec3 n;varying vec3 eye;varying vec3 tangent;void main(){float phi=uv.x*6.2831853;tangent=normalize(mat3(modelMatrix)*vec3(sin(phi),0.,cos(phi)));vUv=uv;n=normalize(mat3(modelMatrix)*normal);eye=cameraPosition-(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-          fragmentShader: `uniform sampler2D day;uniform sampler2D night;uniform sampler2D clouds;uniform sampler2D normalMap;uniform sampler2D oceanMap;uniform float time;varying vec2 vUv;varying vec3 n;varying vec3 eye;varying vec3 tangent;void main(){vec3 N=normalize(n),T=normalize(tangent),B=normalize(cross(N,T));vec3 detail=texture2D(normalMap,vUv).rgb*2.-1.;N=normalize(T*detail.x*.3+B*detail.y*.3+N*detail.z);vec3 L=normalize(vec3(-4.,2.,5.));float d=dot(N,L);vec3 surface=texture2D(day,vUv).rgb;float ocean=texture2D(oceanMap,vUv).r;float cloud=texture2D(clouds,vUv+vec2(time*(1./140.-1./120.),0.)).a;vec3 c=surface*(.018+max(d,0.)*1.12)*(1.-cloud*.12);float spec=pow(max(dot(reflect(-L,N),normalize(eye)),0.),60.);c+=vec3(.7,.85,1.)*spec*ocean*.32;c+=texture2D(night,vUv).rgb*(1.-smoothstep(-.15,.12,d))*.7;float rim=pow(1.-max(dot(N,normalize(eye)),0.),3.);c+=vec3(.03,.22,.4)*rim*max(d+.4,0.);gl_FragColor=vec4(c,1.);}`,
+        mat = earthMaterial({
+          day: tex('earth'),
+          night: tex('night'),
+          clouds: tex('clouds'),
+          normal: tex('earth-normal'),
+          ocean: tex('earth-specular'),
         });
-        mat.dispose();
-        this.body.material = earth;
-        const cloudMat = new MeshStandardMaterial({
-          map: this.loadTexture('clouds', 'png'),
-          transparent: true,
-          opacity: 0.58,
-          depthWrite: false,
+      } else if (p.kind === 'star') {
+        mat = sunMaterial(tex('sun'));
+      } else if (p.id === 'saturn') {
+        mat = saturnBodyMaterial(tex('saturn'), tex('saturn-rings'));
+      } else {
+        const map = p.texture ? tex(p.texture) : null;
+        const rocky = ['moon', 'mercury', 'mars'].includes(p.id);
+        mat = new MeshStandardMaterial({
+          color: map ? '#ffffff' : p.color,
+          roughness: rocky ? 0.97 : 1,
+          map,
+          // Imagery doubles as a height proxy so craters and ridges catch directional light.
+          bumpMap: rocky ? map : null,
+          bumpScale: rocky ? (p.id === 'mars' ? 3 : 6) : 0,
         });
-        this.clouds = new Mesh(new SphereGeometry(1.012, 64, 40), cloudMat);
-        this.object.add(this.clouds);
-        this.object.rotation.z = (23.44 * Math.PI) / 180;
-      } else
-        this.object.rotation.z =
-          ((p.id === 'uranus' ? 97.77 : p.id === 'saturn' ? 26.73 : 3) *
-            Math.PI) /
-          180;
-      this.object.add(this.body);
-      if (p.id === 'earth' || p.kind === 'star') {
-        const atmosphere = new Mesh(
-          new SphereGeometry(p.kind === 'star' ? 1.12 : 1.025, 64, 32),
-          new ShaderMaterial({
-            transparent: true,
-            depthWrite: false,
-            blending: AdditiveBlending,
-            side: DoubleSide,
-            uniforms: {
-              tint: {
-                value: new Color(p.kind === 'star' ? p.color : '#5bafff'),
-              },
-            },
-            vertexShader: `varying vec3 n;varying vec3 v;void main(){vec4 p=modelViewMatrix*vec4(position,1.);n=normalize(normalMatrix*normal);v=normalize(-p.xyz);gl_Position=projectionMatrix*p;}`,
-            fragmentShader: `uniform vec3 tint;varying vec3 n;varying vec3 v;void main(){float f=pow(1.-abs(dot(normalize(n),normalize(v))),3.);gl_FragColor=vec4(tint,f*.4);}`,
-          }),
+      }
+      this.body = new Mesh(new SphereGeometry(1, 128, 64), mat);
+      this.body.rotation.y = ((p.id.length * 1.7) % 6) as number;
+      if (p.id === 'earth') {
+        this.clouds = new Mesh(
+          new SphereGeometry(1.012, 96, 48),
+          cloudShellMaterial(tex('clouds')),
         );
-        this.object.add(atmosphere);
+        this.clouds.renderOrder = 2;
+        this.object.add(this.clouds);
+      }
+      // Axial tilt (degrees). Saturn is additionally pitched towards the camera so the
+      // ring plane is open rather than edge-on at the canonical viewpoint.
+      const tilt: Record<string, number> = {
+        earth: 23.44,
+        moon: 6.68,
+        mercury: 0.03,
+        venus: 177.36,
+        sun: 7.25,
+        mars: 25.19,
+        jupiter: 3.13,
+        saturn: 26.73,
+        uranus: 97.77,
+        neptune: 28.32,
+      };
+      this.object.rotation.z = ((tilt[p.id] ?? 0) * Math.PI) / 180;
+      if (p.id === 'saturn') this.object.rotation.x = 0.42;
+      this.object.add(this.body);
+      const rimSpec: Record<string, [string, number, number, boolean?]> = {
+        earth: ['#5bafff', 3.2, 0.5],
+        venus: ['#ffd9a0', 3, 0.42],
+        mars: ['#d99a76', 4, 0.18],
+        jupiter: ['#e8c9a0', 4, 0.2],
+        saturn: ['#f0dcae', 4, 0.2],
+        uranus: ['#bff3f5', 3.5, 0.3],
+        neptune: ['#6f9bff', 3.5, 0.32],
+        sun: [p.color, 3, 0.3, true],
+      };
+      const rim = rimSpec[p.id];
+      if (rim) {
+        const rimMat = rimMaterial(rim[0], rim[1], rim[2]);
+        if (rim[3]) setRimUnlit(rimMat);
+        this.object.add(
+          new Mesh(
+            new SphereGeometry(p.kind === 'star' ? 1.1 : 1.022, 64, 32),
+            rimMat,
+          ),
+        );
       }
       if (p.id === 'saturn') {
-        const ring = new Mesh(
-          new RingGeometry(1.25, 2.25, 160),
-          new ShaderMaterial({
-            side: DoubleSide,
-            transparent: true,
-            depthWrite: false,
-            vertexShader: `varying vec3 p;void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-            fragmentShader: `varying vec3 p;void main(){float r=length(p.xy);float bands=.55+.15*sin(r*160.)+.1*sin(r*345.);float gap=1.-smoothstep(.015,.03,abs(r-1.8));float a=bands*(1.-gap*.9);vec3 L=normalize(vec3(-.4,.7,1.));float b=dot(p,L);float shadow=step(0.,b*b-dot(p,p)+1.)*step(b,0.);bands*=1.-shadow*.7;gl_FragColor=vec4(vec3(.75,.66,.49)*(.8+.2*sin(r*40.))*(1.-shadow*.7),a);}`,
-          }),
+        this.ring = new Mesh(
+          new RingGeometry(RING_INNER, RING_OUTER, 256, 1),
+          ringMaterial(tex('saturn-rings')),
         );
-        ring.rotation.x = -Math.PI * 0.38;
-        this.object.add(ring);
+        this.ring.rotation.x = -Math.PI / 2;
+        // Draw after the globe so the near ring crosses it and the far ring is occluded.
+        this.ring.renderOrder = 3;
+        this.object.add(this.ring);
       }
     } else if (p.kind === 'probe') {
       this.object.rotation.set(0.3, -0.4, 0.1);
@@ -438,11 +491,10 @@ export class JourneyRenderer {
       group: this.object,
       body: this.body,
       clouds: this.clouds,
+      ring: this.ring,
       field: this.field,
       proxy,
     });
-    for (const next of CHECKPOINTS.slice(index + 1, index + 3))
-      if (next.texture) this.loadTexture(next.texture);
   }
   resize() {
     const width = innerWidth,
@@ -456,14 +508,16 @@ export class JourneyRenderer {
     const mobile = innerWidth < 760;
     const originZ = s.now * SPACING;
     const leg = Math.min(CHECKPOINTS.length - 1, Math.floor(s.position));
-    for (
-      let i = Math.max(0, leg - 1);
-      i <= Math.min(CHECKPOINTS.length - 1, leg + 2);
-      i++
-    )
+    const resident = residentStops(leg);
+    // Earth first: build the active stop, then adjacent stops (preloading their textures).
+    for (const i of [...resident].sort(
+      (a, b) => Math.abs(a - s.now) - Math.abs(b - s.now),
+    ))
       this.setCheckpoint(i);
+    let removed = false;
     for (const [i, node] of this.nodes) {
-      if (i < leg - 1 || i > leg + 2) {
+      if (!resident.includes(i)) {
+        removed = true;
         this.object = node.group;
         this.clear();
         this.scene.remove(node.group, node.proxy);
@@ -472,6 +526,7 @@ export class JourneyRenderer {
         this.nodes.delete(i);
       }
     }
+    if (removed) this.releaseUnusedTextures(leg);
     this.camera.fov = s.cameraPose
       ? 40 + s.warp * 8
       : 36 + 24 * smooth(s.position / 0.15);
@@ -503,9 +558,36 @@ export class JourneyRenderer {
     this.spinRate +=
       ((s.dragging ? 0 : 1) - this.spinRate) *
       (1 - Math.exp(-Math.max(0, time - this.spinTime) * 5));
+    // The stop being approached takes over the light once it dominates the view.
+    const litStop = s.cameraPose && s.legProgress > 0.5 ? s.next : s.now;
+    const litZ = litStop * SPACING - originZ;
+    this.sun.position.set(-4, 3, litZ + (litStop === 0 ? 5 : -5));
+    this.sun.target.position.set(0, 0, litZ);
+    // Departures stay lit by the departing stop's light until the handover.
+    const warpScale = Math.min(1, 0.25 + 0.18 * s.leg);
     for (const [i, node] of this.nodes) {
       node.group.position.set(0, 0, i * SPACING - originZ);
       node.proxy.position.copy(node.group.position);
+      const toSun = new Vector3(-4, 3, i === 0 ? 5 : -5).normalize();
+      for (const child of node.group.children) {
+        if (child instanceof Mesh && child.material instanceof ShaderMaterial) {
+          const u = child.material.uniforms;
+          if (u.uLight) u.uLight.value.copy(toSun);
+          if (u.uCenter) {
+            u.uCenter.value.copy(node.group.position);
+            u.uRingNormal.value
+              .set(0, 1, 0)
+              .applyQuaternion(node.group.quaternion);
+          }
+        }
+      }
+      if (node.ring) {
+        node.group.updateMatrixWorld(true);
+        const inv = this.scratch.copy(node.ring.matrixWorld).invert();
+        (node.ring.material as ShaderMaterial).uniforms.uLight.value
+          .copy(toSun)
+          .transformDirection(inv);
+      }
       const dz = Math.abs(i * SPACING - s.cameraZ),
         fade = 1 - smooth((dz - 45) / 45);
       node.group.visible = fade > 0.001;
@@ -544,29 +626,16 @@ export class JourneyRenderer {
     this.spinTime = time;
     this.warpField.position.copy(this.camera.position);
     this.warpField.visible = s.position > 0.1;
-    this.warpMaterial.uniforms.uWarp.value = s.warp;
+    this.warpMaterial.uniforms.uWarp.value = s.warp * warpScale;
     this.warpMaterial.uniforms.uTravel.value = s.position;
     this.warpMaterial.uniforms.uDirection.value = s.direction;
-    this.sun.position.set(
-      -4,
-      3,
-      s.position < 0.15 ? s.cameraZ + 10 : s.cameraZ - 10,
-    );
-    this.sun.target.position.set(0, 0, leg * SPACING - originZ);
-    if (s.cameraPose) {
-      this.sun.position.set(
-        -4,
-        3,
-        s.now * SPACING - originZ + (s.now === 0 ? 5 : -5),
-      );
-      this.sun.target.position.set(0, 0, s.now * SPACING - originZ);
-    }
     const target = new Vector3(0, 0, s.next * SPACING - originZ).project(
       this.camera,
     );
     this.diagnostics = {
       loaded: [...this.nodes.keys()],
       warp: s.warp,
+      pending: this.pendingTextures,
       camera: this.camera.position.toArray(),
       yaw: s.yaw,
       nodeIds: Object.fromEntries(

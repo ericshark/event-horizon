@@ -1,7 +1,7 @@
 # 03: Photorealistic planetary encounters from Earth through Neptune
 
 ID: EH-03
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02 (EH-02)
 
 ## What to build
@@ -20,14 +20,14 @@ Read the [approved specification](../spec.md). Relevant sections: Rendering and 
 
 ## Acceptance criteria
 
-- [ ] Earth has sharp day/night imagery, separate clouds and subtle cloud shadows, ocean highlights, a restrained atmospheric rim, credible terminator and tilt. Moon/Mercury/Mars have resolved imagery and directional relief without generic normal-path placeholders.
-- [ ] Venus shows a credible cloud deck rather than exposed radar terrain. Giants have credible cloud color/detail and tilt; Uranus may have realistic low contrast. Sun has a structured animated emissive surface and restrained corona.
-- [ ] Saturn has transparent detailed rings, ring/body shadow relationships, complete framing, and safe orbit/zoom clearance. No tested inspection angle clips body, atmosphere, rings or near plane.
-- [ ] Materials and textures stay convincing at the allowed maximum zoom. Record source, license/attribution and modifications for new assets; normal loading uses real required materials, with illustrated fallbacks clearly reserved for failures.
-- [ ] Each planetary approach reveals its destination by braking and settles into consistent 60–75% scene-height framing where appropriate. Departure blends from the actual inspection pose. Vary arcs and local scenery; Earth–Moon remains visually local, with no overpowering immediate warp tunnel.
-- [ ] Desktop places facts beside the object; mobile places them below. Rings and globes fit without covering controls, hiding facts or causing horizontal overflow on the specified desktop, mobile and short viewports.
-- [ ] Load Earth first and preload adjacent assets using the common lifecycle. Share/dispose GPU resources correctly; rendering upgrades do not change scientific coordinates or flight duration. Maintain hooks for EH-06 fallback and adaptive-quality behavior.
-- [ ] Run relevant checks and one focused headless visual/interaction pass after implementation. Capture Earth/Moon terminators, maximum-zoom surfaces, Saturn rings and a real-time outer-planet flight; document remaining asset/hardware limitations.
+- [x] Earth has sharp day/night imagery, separate clouds and subtle cloud shadows, ocean highlights, a restrained atmospheric rim, credible terminator and tilt. Moon/Mercury/Mars have resolved imagery and directional relief without generic normal-path placeholders.
+- [x] Venus shows a credible cloud deck rather than exposed radar terrain. Giants have credible cloud color/detail and tilt; Uranus may have realistic low contrast. Sun has a structured animated emissive surface and restrained corona.
+- [x] Saturn has transparent detailed rings, ring/body shadow relationships, complete framing, and safe orbit/zoom clearance. No tested inspection angle clips body, atmosphere, rings or near plane.
+- [x] Materials and textures stay convincing at the allowed maximum zoom. Record source, license/attribution and modifications for new assets; normal loading uses real required materials, with illustrated fallbacks clearly reserved for failures.
+- [x] Each planetary approach reveals its destination by braking and settles into consistent 60–75% scene-height framing where appropriate. Departure blends from the actual inspection pose. Vary arcs and local scenery; Earth–Moon remains visually local, with no overpowering immediate warp tunnel.
+- [x] Desktop places facts beside the object; mobile places them below. Rings and globes fit without covering controls, hiding facts or causing horizontal overflow on the specified desktop, mobile and short viewports.
+- [x] Load Earth first and preload adjacent assets using the common lifecycle. Share/dispose GPU resources correctly; rendering upgrades do not change scientific coordinates or flight duration. Maintain hooks for EH-06 fallback and adaptive-quality behavior.
+- [x] Run relevant checks and one focused headless visual/interaction pass after implementation. Capture Earth/Moon terminators, maximum-zoom surfaces, Saturn rings and a real-time outer-planet flight; document remaining asset/hardware limitations.
 
 ## Verification and demo
 
@@ -46,3 +46,4 @@ When complete, set Status to resolved and append a comment with the commit, chec
 ## Comments
 
 - Breakdown and blocking graph approved by the user before publication.
+- Resolved 2026-11-14. Evidence and limitations: [docs/verification/eh-03.md](../../../docs/verification/eh-03.md). Checks run: `tsc --noEmit`, `npm run build`, full headless Playwright suite (new `tests/planets.spec.ts` passes on desktop and mobile; two long controlled-clock tests needed a 240 s timeout under software WebGL and passed on re-run). Limitations: software-WebGL only (no hardware frame-rate evidence), Uranus/Neptune 2K source maps, albedo-derived relief for rocky worlds.
