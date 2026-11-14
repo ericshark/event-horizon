@@ -9,7 +9,7 @@ The user approved this seven-ticket breakdown and dependency graph. The configur
 | ID    | Ticket                                                                                                                | Blocked by                 | Status          |
 | ----- | --------------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------- |
 | EH-01 | [Interactive Earth–Moon flight with live telemetry](issues/01-earth-moon-flight.md)                                   | None                       | resolved        |
-| EH-02 | [Complete 13-stop route, scientific model, and navigation](issues/02-complete-route-navigation.md)                    | EH-01                      | ready-for-agent |
+| EH-02 | [Complete 13-stop route, scientific model, and navigation](issues/02-complete-route-navigation.md)                    | EH-01                      | resolved        |
 | EH-03 | [Photorealistic planetary encounters from Earth through Neptune](issues/03-photorealistic-planets.md)                 | EH-02                      | ready-for-agent |
 | EH-04 | [Voyager and Proxima encounters with immersive interstellar travel and audio](issues/04-interstellar-travel-audio.md) | EH-02                      | ready-for-agent |
 | EH-05 | [Sagittarius A* observation, explicit descent, and replay](issues/05-black-hole-finale.md)                            | EH-02                      | ready-for-agent |
@@ -31,7 +31,7 @@ flowchart LR
 
 ## Execution
 
-EH-01 is resolved (implementation `66f08cb`). The next unblocked ready-for-agent ticket is **EH-02**. A ready-for-agent ticket may start only when every listed blocker is resolved. After EH-02, EH-03 through EH-06 have no semantic dependencies on each other; coordinate shared renderer/UI edits if implemented concurrently. EH-07 waits for all four. Follow the tracker convention to claim work and mark completed tickets resolved; ticket files are authoritative if this summary becomes stale.
+EH-01 (`66f08cb`) and EH-02 (`20ef706`) are resolved. EH-02's acceptance evidence is in [docs/verification/eh-02.md](../../docs/verification/eh-02.md). The next unblocked ready-for-agent ticket is **EH-03**. EH-03 through EH-06 are now unblocked and have no semantic dependencies on each other; coordinate shared renderer/UI edits if implemented concurrently. A ready-for-agent ticket may start only when every listed blocker is resolved. EH-07 waits for all four. Follow the tracker convention to claim work and mark completed tickets resolved; ticket files are authoritative if this summary becomes stale.
 
 Each implementation ticket must land with its relevant checks and a working demo. EH-07 adds integrated acceptance, rather than carrying all testing. EH-01 uses an additive controller/temporary adapter to keep later existing destinations functional until EH-02 migrates the complete route. No separate infrastructure-only prefactoring ticket is needed.
 
