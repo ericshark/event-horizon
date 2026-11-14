@@ -25,6 +25,7 @@ import {
   travelTime,
 } from './science';
 import { JourneyRenderer } from './renderer';
+import { AudioEngine } from './audio';
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
 const picker = $<HTMLSelectElement>('#checkpoints');
@@ -32,7 +33,8 @@ for (const [i, p] of CHECKPOINTS.entries())
   picker.add(new Option(`${String(i + 1).padStart(2, '0')} / ${p.name}`, p.id));
 const renderer = JourneyRenderer.create($<HTMLCanvasElement>('#universe'));
 document.documentElement.classList.add(renderer ? 'has-webgl' : 'no-webgl');
-const controller = new JourneyController(),
+const audio = new AudioEngine(),
+  controller = new JourneyController(),
   wheel = new WheelIntent();
 const digits = new RollingDigits($('#speed-digits'));
 const maximumMph = Math.max(
@@ -325,6 +327,7 @@ function frame() {
       `Arrived at ${CHECKPOINTS[state.now].name}.`;
   }
   renderer?.render(state, time);
+  audio.update(state as TimedFrame);
   if (state.now !== selected || state.phase !== lastPhase || now - uiAt >= 70) {
     updateUI();
     uiAt = now;
@@ -336,6 +339,7 @@ gsap.ticker.lagSmoothing(0);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) controller.pause(performance.now());
   visible = !document.hidden;
+  audio.setHidden(document.hidden);
   clearInspection();
   wheel.reset();
   last = performance.now();
@@ -348,6 +352,7 @@ window.addEventListener(
   'pagehide',
   () => {
     gsap.ticker.remove(frame);
+    audio.dispose();
     renderer?.dispose();
   },
   { once: true },
@@ -364,6 +369,7 @@ declare global {
       visible: () => boolean;
       axis: () => ReturnType<typeof distanceAxis>;
       render: () => JourneyRenderer['diagnostics'] | undefined;
+      audio: () => ReturnType<AudioEngine['diagnostics']>;
     };
   }
 }
@@ -374,7 +380,34 @@ window.__horizon = {
   visible: () => visible,
   axis: () => axisModel,
   render: () => renderer?.diagnostics,
+  audio: () => audio.diagnostics(),
 };
+
+const soundToggle = $<HTMLButtonElement>('#sound-toggle');
+function updateSound() {
+  const status = audio.status;
+  soundToggle.hidden = !audio.available;
+  soundToggle.dataset.state = status;
+  soundToggle.setAttribute('aria-pressed', String(status !== 'off'));
+  $('#sound-label').textContent =
+    status === 'off'
+      ? 'Sound off'
+      : status === 'on'
+        ? 'Sound on'
+        : 'Sound on · tap to allow';
+}
+audio.onchange = updateSound;
+soundToggle.addEventListener('click', () => {
+  // A click on a blocked "on" state is the gesture that lets playback resume.
+  void audio
+    .set(audio.status === 'blocked' ? true : !audio.preference)
+    .then(() => {
+      $('#journey-announcement').textContent = audio.preference
+        ? 'Sound on.'
+        : 'Sound off.';
+    });
+});
+updateSound();
 
 function launch(direction: number) {
   if (

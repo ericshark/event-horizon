@@ -19,6 +19,8 @@ export interface TimedFrame extends FlightState {
   playback: Playback;
   elapsed: number;
   speedKmS: number;
+  /** Normalised speed envelope, 0 at rest and 1 at the cruise plateau. */
+  thrust: number;
   scientificPosition: Vec;
   cameraPose: CameraPose;
   flightPhase:
@@ -57,7 +59,9 @@ export function schedule(elapsed: number, duration = 6) {
     p = 0.4 + 0.45 * (u - integral(u));
     v = 1 - quintic(u);
   }
+  const moving_ = elapsed > departure && elapsed < duration - settle;
   return {
+    thrust: moving_ ? v : 0,
     progress: clamp(p / area),
     rate:
       elapsed <= departure || elapsed >= duration - settle
@@ -104,13 +108,15 @@ function facing(position: Vec, target: Vec) {
 function pose(position: Vec, target: Vec): CameraPose {
   return { position, rotation: facing(position, target).toArray() };
 }
-function viewingRadius(stop: number) {
+/** Voyager is framed far enough back that its compressed booms stay inside maximum zoom. */
+export const PROBE_VIEWING_RADIUS = 12;
+export function viewingRadius(stop: number) {
   // Saturn: rings (outer radius 2.3) stay inside the frame at maximum zoom and any pitch.
   if (CHECKPOINTS[stop].id === 'saturn') return 8.4;
   return CHECKPOINTS[stop].kind === 'blackhole'
     ? 7
     : CHECKPOINTS[stop].kind === 'probe'
-      ? 6
+      ? PROBE_VIEWING_RADIUS
       : 4.1392246;
 }
 function canonical(stop: number): CameraPose {
@@ -299,6 +305,7 @@ export class JourneyController {
       localRangeKm: CHECKPOINTS[this.stop].range,
       earthKm: norm(scientificPosition),
       speedKmS,
+      thrust: observing ? 0 : timing.thrust,
       scientificPosition,
       playback: this.playback,
       elapsed: this.elapsed,

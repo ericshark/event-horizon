@@ -98,5 +98,26 @@
     "source": "https://www.solarsystemscope.com/textures/saturn-rings",
     "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
     "modifications": "Used unmodified; radial strip mapped to ring radius 1.2\u20132.3 body radii."
+  },
+  {
+    "file": "voyager-model (procedural, no image file)",
+    "credit": "Original geometry authored for this project from NASA/JPL Voyager spacecraft descriptions (3.7 m high-gain dish, RTG, science and magnetometer booms, plasma-wave antennas)",
+    "source": "https://science.nasa.gov/mission/voyager/spacecraft/",
+    "license": "Original work",
+    "modifications": "Boom lengths shortened to about a quarter so the whole silhouette stays in frame at maximum zoom; surface materials are illustrative."
+  },
+  {
+    "file": "proxima-surface (procedural shader, no image file)",
+    "credit": "Original GLSL noise shader authored for this project; colours chosen for a cool M-type red dwarf",
+    "source": "https://science.nasa.gov/exoplanets/proxima-centauri-b/",
+    "license": "Original work",
+    "modifications": "No resolved surface image of Proxima Centauri exists; granulation, starspots and flare regions are artistic."
+  },
+  {
+    "file": "interstellar-audio (synthesised at runtime, no audio file)",
+    "credit": "Web Audio oscillators and filtered noise generated in the browser; no recorded or third-party audio",
+    "source": "https://developer.mozilla.org/docs/Web/API/Web_Audio_API",
+    "license": "Original work",
+    "modifications": "None; gains follow the flight snapshot."
   }
 ]

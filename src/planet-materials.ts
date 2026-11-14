@@ -102,6 +102,40 @@ void main(){
   });
 }
 
+/**
+ * Proxima Centauri: a small, cool M-dwarf. Deep red-orange convective cells, dark
+ * starspots and a slow flare-brightened region; strong limb darkening and no yellow,
+ * so it cannot be mistaken for the Sun. Procedural: no texture is required.
+ */
+export function proximaMaterial() {
+  return new ShaderMaterial({
+    uniforms: { time: { value: 0 } },
+    vertexShader: VERT,
+    fragmentShader: `uniform float time;varying vec2 vUv;varying vec3 vN;varying vec3 vW;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*vn(p);p*=2.07;a*=.5;}return s;}
+void main(){
+  vec2 q=vUv*vec2(10.,5.);
+  vec2 warp=vec2(fbm(q+time*.03),fbm(q-time*.025+9.))-.5;
+  float cells=fbm(q*3.+warp*2.4+vec2(time*.02,0.));
+  float fine=vn(vUv*vec2(260.,130.)+time*.2);
+  float spots=smoothstep(.62,.8,fbm(vUv*vec2(6.,3.)+vec2(3.1,time*.004)));
+  float flare=smoothstep(.72,.9,fbm(vUv*vec2(5.,2.5)+17.+time*.01));
+  vec3 deep=vec3(.42,.07,.03),mid=vec3(.95,.27,.1),hot=vec3(1.,.5,.22);
+  vec3 c=mix(deep,mid,smoothstep(.25,.7,cells));
+  c=mix(c,hot,smoothstep(.6,.95,cells)*.5+flare*.55);
+  c*=.88+.24*fine;
+  c*=1.-spots*.7;
+  float mu=max(dot(normalize(vN),normalize(cameraPosition-vW)),0.);
+  c*=.18+.82*pow(mu,.8);
+  c=mix(c,c*vec3(.85,.45,.35),1.-mu);
+  gl_FragColor=vec4(c*1.25,1.);
+  #include <colorspace_fragment>
+}`,
+  });
+}
+
 /** Thin additive atmosphere/corona rim. */
 export function rimMaterial(tint: string, power: number, strength: number) {
   return new ShaderMaterial({

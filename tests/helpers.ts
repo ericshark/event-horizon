@@ -43,3 +43,35 @@ export async function hasHorizontalOverflow(page: Page) {
     () => document.documentElement.scrollWidth > window.innerWidth + 1,
   );
 }
+
+/** Mean colour of the bright pixels (the lit object) in a screenshot. */
+export async function brightColor(page: Page, png: Buffer) {
+  return page.evaluate(async (base64) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(image, 0, 0);
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let r = 0,
+      g = 0,
+      b = 0,
+      n = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] + data[i + 1] + data[i + 2] < 150) continue;
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+      n++;
+    }
+    return {
+      r: r / Math.max(1, n),
+      g: g / Math.max(1, n),
+      b: b / Math.max(1, n),
+      n,
+    };
+  }, png.toString('base64'));
+}

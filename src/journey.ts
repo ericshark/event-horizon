@@ -481,12 +481,12 @@ const additionalFacts: Record<string, [string, string][]> = {
   ],
   voyager: [
     ['Launch', '5 September 1977'],
-    ['Estimated Earth distance', '≈ 172 AU · epoch 2026-10-29'],
     ['Probe speed', '≈ 17 km/s · relative to Sun'],
+    ['High-gain dish', '3.7 m · booms shortened in model'],
   ],
   proxima: [
     ['Earth distance', '≈ 4.25 light-years'],
-    ['Star type', 'Red dwarf'],
+    ['Star type', 'Red dwarf · surface illustrative'],
     ['Diameter', '≈ 214,560 km · model'],
   ],
   'sagittarius-a': [

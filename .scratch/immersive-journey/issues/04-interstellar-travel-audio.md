@@ -1,7 +1,7 @@
 # 04: Voyager and Proxima encounters with immersive interstellar travel and audio
 
 ID: EH-04
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02 (EH-02)
 
 ## What to build
@@ -20,14 +20,14 @@ Read the [approved specification](../spec.md). Relevant sections: Itinerary and 
 
 ## Acceptance criteria
 
-- [ ] Voyager has recognizable dish/core/booms/antenna proportions and credible materials, with complete silhouette, safe orbit/zoom and spacecraft-specific facts. Proxima has a structured emissive red-dwarf appearance distinct from the Sun and sourced facts.
-- [ ] The 26-, 34- and 50-second legs preserve specified timing and speed derivation. Scenery evolves during sustained cruise; acceleration and long braking remain legible rather than repeating an identical tunnel.
-- [ ] Use peripheral streaks, forward star movement and restrained FOV changes without roll, repeated camera shake, abrupt whiteout or overlay jumps. The destination appears by braking, and departure starts continuously from inspection.
-- [ ] Incidental Kuiper/heliopause/Oort/interstellar scenery creates no additional stops. Voyager remains before Oort scenery. Do not depict an obstacle-dense asteroid field or relocate scientific boundaries for spectacle.
-- [ ] Audio starts off; an explicit toggle activates a restrained ambient bed, eased acceleration intensity and soft arrival. Audio follows the authoritative snapshot and works with reverse, pause, skip, direct jump and hidden tabs without spikes, leaks or autonomous timing.
-- [ ] Persist sound preference while honoring browser gesture restrictions on subsequent loads. Autoplay denial leaves silent playback usable and produces no uncaught error. Playback/sound controls remain discreet during transit.
-- [ ] Record asset/audio provenance. Use the common preload/disposal and quality interfaces, keeping later reduced-motion/fallback integration possible. No separate renderer or flight clock is introduced.
-- [ ] Test Voyager/Proxima inspection and all audio lifecycle actions. Capture a real-time final 50-second flight for sustained-interest review, readable instruments and smooth effects decay; final black-hole-specific appearance may be verified in EH-07 after EH-05.
+- [x] Voyager has recognizable dish/core/booms/antenna proportions and credible materials, with complete silhouette, safe orbit/zoom and spacecraft-specific facts. Proxima has a structured emissive red-dwarf appearance distinct from the Sun and sourced facts.
+- [x] The 26-, 34- and 50-second legs preserve specified timing and speed derivation. Scenery evolves during sustained cruise; acceleration and long braking remain legible rather than repeating an identical tunnel.
+- [x] Use peripheral streaks, forward star movement and restrained FOV changes without roll, repeated camera shake, abrupt whiteout or overlay jumps. The destination appears by braking, and departure starts continuously from inspection.
+- [x] Incidental Kuiper/heliopause/Oort/interstellar scenery creates no additional stops. Voyager remains before Oort scenery. Do not depict an obstacle-dense asteroid field or relocate scientific boundaries for spectacle.
+- [x] Audio starts off; an explicit toggle activates a restrained ambient bed, eased acceleration intensity and soft arrival. Audio follows the authoritative snapshot and works with reverse, pause, skip, direct jump and hidden tabs without spikes, leaks or autonomous timing.
+- [x] Persist sound preference while honoring browser gesture restrictions on subsequent loads. Autoplay denial leaves silent playback usable and produces no uncaught error. Playback/sound controls remain discreet during transit.
+- [x] Record asset/audio provenance. Use the common preload/disposal and quality interfaces, keeping later reduced-motion/fallback integration possible. No separate renderer or flight clock is introduced.
+- [x] Test Voyager/Proxima inspection and all audio lifecycle actions. Capture a real-time final 50-second flight for sustained-interest review, readable instruments and smooth effects decay; final black-hole-specific appearance may be verified in EH-07 after EH-05.
 
 ## Verification and demo
 
@@ -46,3 +46,4 @@ When complete, set Status to resolved and append a comment with the commit, chec
 ## Comments
 
 - Breakdown and blocking graph approved by the user before publication.
+- 2026-11-14 resolved. Evidence: `docs/verification/eh-04.md`; captures in `artifacts/eh-04/`. Checks run: `npx tsc --noEmit`; full `PW_HEADLESS=true npx playwright test` (desktop + mobile, SwiftShader) — 93 of 94 passed; the one failure (`horizon.spec.ts:9` desktop, empty `#location` under parallel load) passed on isolated re-run. Limitations: software WebGL only (no real-GPU frame pacing, audio never heard), mobile frames not reviewed by eye. Code-review follow-ups (not done): mobile FOV stays fixed at 100° so FOV expansion is desktop-only; hidden tab cuts master gain instantly rather than fading; `thrust` was added to the shared snapshot (`TimedFrame`) and EH-05 should know; unused exports (`VOYAGER_AU`, `NEPTUNE_STOP`, `viewingRadius`, `SETTLE_SECONDS`) and per-leg tables in `scenery.ts` could become one profile record; motion-mode hooks for streaks/audio are EH-06 work.

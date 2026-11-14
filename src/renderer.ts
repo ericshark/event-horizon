@@ -5,8 +5,6 @@ import {
   LineSegments,
   AmbientLight,
   BufferGeometry,
-  ConeGeometry,
-  CylinderGeometry,
   DirectionalLight,
   DoubleSide,
   Float32BufferAttribute,
@@ -28,9 +26,11 @@ import {
   TextureLoader,
   Vector3,
   WebGLRenderer,
-  BoxGeometry,
 } from 'three';
 import { smooth } from './science';
+import { buildVoyager } from './voyager';
+import { SceneryLayers } from './scenery-layers';
+import { fovExpansion, sceneryAt, streakStrength } from './scenery';
 import { CHECKPOINTS } from './journey';
 import { SPACING, type FlightState } from './flight';
 import { ASSETS, residentAssets, residentStops } from './assets';
@@ -39,6 +39,7 @@ import {
   RING_OUTER,
   cloudShellMaterial,
   earthMaterial,
+  proximaMaterial,
   ringMaterial,
   rimMaterial,
   saturnBodyMaterial,
@@ -72,6 +73,7 @@ export class JourneyRenderer {
       proxy: Points;
     }
   >();
+  private scenery = new SceneryLayers();
   private warpField!: LineSegments;
   private warpMaterial!: ShaderMaterial;
   private background!: Mesh;
@@ -82,6 +84,8 @@ export class JourneyRenderer {
     camera: [0, 0, 0] as number[],
     yaw: 0,
     nodeIds: {} as Record<number, string>,
+    scenery: {} as Record<string, number>,
+    fov: 0,
     target: { x: 0, y: 0, visible: false },
   };
   private scale = 0.85;
@@ -180,7 +184,7 @@ export class JourneyRenderer {
     this.warpField = new LineSegments(wg, this.warpMaterial);
     this.warpField.frustumCulled = false;
     this.warpField.renderOrder = 10;
-    this.scene.add(this.warpField);
+    this.scene.add(this.warpField, this.scenery.group);
     this.loadTexture('earth');
     this.resize();
   }
@@ -279,6 +283,8 @@ export class JourneyRenderer {
           normal: tex('earth-normal'),
           ocean: tex('earth-specular'),
         });
+      } else if (p.id === 'proxima') {
+        mat = proximaMaterial();
       } else if (p.kind === 'star') {
         mat = sunMaterial(tex('sun'));
       } else if (p.id === 'saturn') {
@@ -331,6 +337,7 @@ export class JourneyRenderer {
         uranus: ['#bff3f5', 3.5, 0.3],
         neptune: ['#6f9bff', 3.5, 0.32],
         sun: [p.color, 3, 0.3, true],
+        proxima: ['#ff4d2e', 3.2, 0.38, true],
       };
       const rim = rimSpec[p.id];
       if (rim) {
@@ -354,45 +361,9 @@ export class JourneyRenderer {
         this.object.add(this.ring);
       }
     } else if (p.kind === 'probe') {
-      this.object.rotation.set(0.3, -0.4, 0.1);
-      const dish = new Mesh(
-        new ConeGeometry(0.95, 0.32, 64, 1, true),
-        new MeshStandardMaterial({
-          color: '#e3e0d1',
-          side: DoubleSide,
-          metalness: 0.6,
-          roughness: 0.4,
-        }),
-      );
-      dish.rotation.x = Math.PI / 2;
-      this.object.add(dish);
-      const core = new Mesh(
-        new BoxGeometry(0.5, 0.35, 0.45),
-        new MeshStandardMaterial({
-          color: '#b49b4b',
-          metalness: 0.8,
-          roughness: 0.5,
-        }),
-      );
-      core.position.z = -0.35;
-      this.object.add(core);
-      for (const [angle, length] of [
-        [0, 3.5],
-        [2.1, 2.2],
-        [4.2, 2.2],
-      ]) {
-        const boom = new Mesh(
-          new CylinderGeometry(0.012, 0.012, length, 8),
-          new MeshStandardMaterial({ color: '#c9c8ba' }),
-        );
-        boom.rotation.z = angle;
-        boom.position.set(
-          (Math.sin(-angle) * length) / 2,
-          (-Math.cos(angle) * length) / 2,
-          -0.2,
-        );
-        this.object.add(boom);
-      }
+      // Dish faces the approaching camera, turned so the booms read in silhouette.
+      this.object.rotation.set(0.32, Math.PI + 1.15, 0.1);
+      this.object.add(buildVoyager());
     } else if (p.kind === 'field') {
       const points = [],
         n = p.id === 'oort' ? 420 : 650;
@@ -507,7 +478,8 @@ export class JourneyRenderer {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
   }
-  render(s: FlightState, time: number) {
+  render(s: FlightState & { thrust?: number }, time: number) {
+    const thrust = s.thrust ?? 0;
     const mobile = innerWidth < 760;
     const originZ = s.now * SPACING;
     const leg = Math.min(CHECKPOINTS.length - 1, Math.floor(s.position));
@@ -531,7 +503,7 @@ export class JourneyRenderer {
     }
     if (removed) this.releaseUnusedTextures(leg);
     this.camera.fov = s.cameraPose
-      ? 40 + s.warp * 8
+      ? 40 + fovExpansion(s.leg, s.warp, thrust)
       : 36 + 24 * smooth(s.position / 0.15);
     if (mobile) this.camera.fov = s.cameraPose ? 100 : 75;
     this.camera.aspect = innerWidth / innerHeight;
@@ -567,7 +539,6 @@ export class JourneyRenderer {
     this.sun.position.set(-4, 3, litZ + (litStop === 0 ? 5 : -5));
     this.sun.target.position.set(0, 0, litZ);
     // Departures stay lit by the departing stop's light until the handover.
-    const warpScale = Math.min(1, 0.25 + 0.18 * s.leg);
     for (const [i, node] of this.nodes) {
       node.group.position.set(0, 0, i * SPACING - originZ);
       node.proxy.position.copy(node.group.position);
@@ -628,8 +599,24 @@ export class JourneyRenderer {
     }
     this.spinTime = time;
     this.warpField.position.copy(this.camera.position);
+    const scenery = sceneryAt(s.earthKm, s.position);
+    (this.background.material as MeshBasicMaterial).color.setRGB(
+      ...scenery.tint,
+      SRGBColorSpace,
+    );
+    this.scenery.update(
+      this.camera.position,
+      scenery,
+      s.position,
+      (innerHeight * this.renderer.getPixelRatio() * 0.5) /
+        Math.tan((this.camera.fov * Math.PI) / 360),
+    );
     this.warpField.visible = s.position > 0.1;
-    this.warpMaterial.uniforms.uWarp.value = s.warp * warpScale;
+    this.warpMaterial.uniforms.uWarp.value = streakStrength(
+      s.leg,
+      s.warp,
+      thrust,
+    );
     this.warpMaterial.uniforms.uTravel.value = s.position;
     this.warpMaterial.uniforms.uDirection.value = s.direction;
     const target = new Vector3(0, 0, s.next * SPACING - originZ).project(
@@ -639,6 +626,8 @@ export class JourneyRenderer {
       loaded: [...this.nodes.keys()],
       warp: s.warp,
       pending: this.pendingTextures,
+      scenery: this.scenery.weights,
+      fov: this.camera.fov,
       camera: this.camera.position.toArray(),
       yaw: s.yaw,
       nodeIds: Object.fromEntries(
@@ -680,6 +669,7 @@ export class JourneyRenderer {
       (n.proxy.material as PointsMaterial).dispose();
     }
     this.nodes.clear();
+    this.scenery.dispose();
     this.warpField.geometry.dispose();
     this.warpMaterial.dispose();
     this.background.geometry.dispose();
