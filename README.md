@@ -81,18 +81,20 @@ retains instruments and playback controls; facts return during settling.
 
 ## Rendering and verification
 
-Existing imagery and materials remain pending EH-03/EH-04. Earth uses NASA
-day/night imagery, normals, ocean highlights, separate clouds and an atmospheric
-rim. Asset provenance is in `public/textures/credits.json`. All runtime assets
-are bundled locally. Missing imagery uses illustrated materials; no-WebGL mode
-retains route, facts, timing, instruments and navigation. Comprehensive motion
-preferences and failure recovery belong to EH-06.
+Planetary encounters (EH-03), Voyager/Proxima and interstellar scenery with
+optional audio (EH-04), the Sagittarius A* finale (EH-05) and motion modes,
+keyboard/focus, load timeouts, context-loss recovery and static no-WebGL mode
+(EH-06) are integrated. Asset provenance is in `public/textures/credits.json`.
+All runtime assets are bundled locally; missing imagery uses illustrated
+materials. Reduced motion (System/Full/Reduced) covers every effect through the
+descent and ending, and sound pauses, skips and resets with playback.
 
 Tests cover the exact itinerary and schedule, both directions on every leg,
 analytic speed integration, scientific path and camera clearance, safe galactic
 sampling, wheel ownership, pause/skip, inspection, direct/history/legacy links,
 maximum-width telemetry, responsive layout, source dialogs and fallback.
-See `docs/verification/eh-02.md` for acceptance evidence and limitations.
+Per-ticket evidence is in `docs/verification/eh-01.md`–`eh-06.md`; the final
+integrated acceptance report is [EH-07](docs/verification/eh-07.md).
 
 To record representative real-time Earth–Moon, Jupiter–Saturn and final
 Proxima–Sagittarius A* flights, start a verification server, then run:

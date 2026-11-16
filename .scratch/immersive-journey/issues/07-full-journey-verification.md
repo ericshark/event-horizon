@@ -1,7 +1,7 @@
 # 07: Integrate and verify the complete immersive journey
 
 ID: EH-07
-Status: ready-for-agent
+Status: resolved
 Blocked by: 03 (EH-03), 04 (EH-04), 05 (EH-05), 06 (EH-06)
 
 ## What to build
@@ -51,3 +51,4 @@ When complete, set Status to resolved and append a comment with the commit, chec
 ## Comments
 
 - Breakdown and blocking graph approved by the user before publication.
+- Resolved 2026-11-16. Checks: build, format:check, full Playwright (118/120; 2 SwiftShader-load flakes in planets.spec passed on isolated reruns). Evidence: [docs/verification/eh-07.md](../../../docs/verification/eh-07.md). Limitation: real-hardware frame pacing and physical-device checks unverified (software rendering only).
