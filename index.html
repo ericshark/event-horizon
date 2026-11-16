@@ -75,11 +75,12 @@
     </aside>
     <section id="timed-instruments" aria-label="Travel instruments" hidden>
       <div>
-        <span>Virtual travel speed</span
-        ><strong
+        <span id="speed-label">Virtual travel speed</span
+        ><strong id="speed-readout"
           ><span id="speed-digits" aria-hidden="true"></span>
           <small>mph</small></strong
-        ><small id="light-speed"></small>
+        ><small id="light-speed"></small
+        ><strong id="horizon-radius" hidden></strong>
       </div>
       <div>
         <span>Earth distance</span><strong id="earth-miles"></strong
@@ -96,6 +97,9 @@
       hidden
     ></div>
     <div id="timed-navigation" hidden>
+      <button id="enter-horizon" type="button" hidden>
+        Enter the event horizon
+      </button>
       <button id="previous" type="button">Previous</button
       ><button id="next" type="button">Next</button>
       <button id="zoom-in" type="button" aria-label="Zoom in">+</button
@@ -138,16 +142,16 @@
       <i></i><span id="destination-name"></span>
     </div>
     <section id="ending" hidden aria-label="Journey summary">
-      <p class="eyebrow">BEYOND THE LAST RETURN SIGNAL</p>
       <h2>Journey complete.</h2>
       <p id="final-stats"></p>
       <blockquote>
         “We can measure the distance. We are still learning what lies beyond.”
       </blockquote>
       <p class="ending-caption">
-        A theoretical interior. No physical return is possible.
+        An illustrative interior, not a survival or geodesic simulation. Return
+        to Earth replays the journey.
       </p>
-      <a href="#earth">Return to Earth ↑</a>
+      <a id="replay" href="#earth">Return to Earth</a>
     </section>
     <nav
       id="rail"

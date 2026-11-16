@@ -75,12 +75,19 @@ async function go(id: string, record = true, fade = true) {
   if (fade) await new Promise((resolve) => setTimeout(resolve, 160));
   if (token !== navigationToken) return;
   controller.observe(resolveStop(id));
+  if (resolveStop(id) === 0) {
+    time = 0;
+    renderer?.resetTiming();
+    document.body.classList.remove('journey-detail-open');
+    $('#journey-detail').setAttribute('aria-expanded', 'false');
+  }
   state = controller.snapshot();
   updateUI();
   const hash = `#${CHECKPOINTS[state.now].id}`;
   if (record && location.hash !== hash) history.pushState(null, '', hash);
   else history.replaceState(null, '', hash);
   document.body.classList.remove('direct-navigation');
+  if (id === 'earth') $('#next').focus();
 }
 window.addEventListener(
   'hashchange',
@@ -152,7 +159,7 @@ function updateDetails() {
       ],
     );
   $('#details-content').innerHTML =
-    `<p>${p.description}</p><dl>${metrics.map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}${(p.facts ?? []).map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}</dl><p class="note">${p.note}</p><p class="note">Earth distance is straight-line displacement from Earth's center, rounded to the nearest mile in the instrument. Tour distance follows the authored route. Inspection changes neither value. Virtual speed is the route-distance derivative; ×c uses the same km/s. Facts and approximate model values: see the linked source and source limitations.${` <a href="${OBSERVATION_FACTS[p.id].source}" target="_blank" rel="noreferrer">NASA · ${p.name} reference</a>`}</p><p class="note">Distances and visibility are rescaled in the visuals. Warp streaks illustrate compressed travel, not an actual faster-than-light spacecraft. Reference positions are approximations, not Horizons vectors. Parker comparisons hold its record speed constant without acceleration or braking.</p>${p.kind === 'blackhole' ? '<p class="note">The bright ring is illustrative. Optical framing is independent of the scientific observation radius; spin and relativistic orbital evolution are omitted.</p>' : ''}`;
+    `<p>${p.description}</p><dl>${metrics.map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}${(p.facts ?? []).map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}</dl><p class="note">${p.note}</p><p class="note">Earth distance is straight-line displacement from Earth's center, rounded to the nearest mile in the instrument. Tour distance follows the authored route. Inspection changes neither value. Virtual speed is the route-distance derivative; ×c uses the same km/s. Facts and approximate model values: see the linked source and source limitations.${` <a href="${OBSERVATION_FACTS[p.id].source}" target="_blank" rel="noreferrer">NASA · ${p.name} reference</a>`}</p><p class="note">Distances and visibility are rescaled in the visuals. Warp streaks illustrate compressed travel, not an actual faster-than-light spacecraft. Reference positions are approximations, not Horizons vectors. Parker comparisons hold its record speed constant without acceleration or braking.</p>${p.kind === 'blackhole' ? '<p class="note">The bright ring is illustrative. Optical framing is independent of the scientific observation radius; spin and relativistic orbital evolution are omitted. The descent and dark interior are illustrative, not a survival or geodesic simulation; the radius is not a measured local velocity.</p>' : ''}`;
 }
 function openCluster(indices: number[]) {
   const points = indices.map((i) => CUMULATIVE[i]),
@@ -227,6 +234,8 @@ function updateTimedUI() {
   $('#timed-instruments').hidden = false;
   $('#inspection').hidden = false;
   const s = state as TimedFrame,
+    complete = s.playback === 'complete',
+    descent = s.sequence === 'descent',
     flying = s.playback !== 'observing';
   document.body.dataset.playback = s.playback;
   document.body.classList.toggle('in-flight', flying);
@@ -235,7 +244,13 @@ function updateTimedUI() {
     element.inert = flying;
   $('#timed-navigation').hidden = flying;
   $('#inspection').inert = flying || !renderer;
-  $('#playback-controls').hidden = !flying;
+  $('#playback-controls').hidden = !flying || complete;
+  $('#enter-horizon').hidden =
+    flying || CHECKPOINTS[s.now].kind !== 'blackhole';
+  $('#skip-flight').textContent = descent ? 'Finish descent' : 'Skip flight';
+  $('#ending').hidden = !complete;
+  $('#timed-instruments').hidden = complete;
+  $('#inspection').hidden = complete;
   $('#begin').hidden = true;
   $('#destination-marker').hidden = true;
   const observationIndex = s.flightPhase === 'settling' ? s.next : s.now;
@@ -274,6 +289,13 @@ function updateTimedUI() {
     s.playback !== 'flying',
     matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
+  $('#speed-label').textContent = descent
+    ? 'Horizon approach'
+    : 'Virtual travel speed';
+  $('#speed-readout').hidden = descent;
+  $('#light-speed').hidden = descent;
+  $('#horizon-radius').hidden = !descent;
+  $('#horizon-radius').textContent = `${s.bhRadius.toFixed(3)} rₛ`;
   $('#light-speed').textContent = `${(s.speedKmS / C).toFixed(2)} ×c`;
 }
 function updateUI() {
@@ -291,9 +313,9 @@ function updateUI() {
   $('#route-value').textContent = distance(state.routeKm);
   $('#time-value').textContent = duration(state.routeKm / C);
   $('#cinematic-note').hidden = p.kind !== 'blackhole';
-  $('#ending').hidden = true;
+  $('#ending').hidden = state.playback !== 'complete';
   $('#final-stats').textContent =
-    `${distance(TOTAL)} through ${CHECKPOINTS.length} stops; ${PLAYBACK_SECONDS} seconds of playback. ${duration(travelTime(TOTAL))} light-equivalent route time.`;
+    `${distance(TOTAL)} through ${CHECKPOINTS.length} stops; ${PLAYBACK_SECONDS} seconds of forward route playback, plus 20 seconds of optional descent. ${duration(travelTime(TOTAL))} light-equivalent route time.`;
   picker.value = p.id;
   if (selected !== state.now) {
     selected = state.now;
@@ -325,6 +347,12 @@ function frame() {
     $(state.now === CHECKPOINTS.length - 1 ? '#previous' : '#next').focus();
     $('#journey-announcement').textContent =
       `Arrived at ${CHECKPOINTS[state.now].name}.`;
+  }
+  if (previousPlayback !== 'complete' && state.playback === 'complete') {
+    updateUI();
+    $('#replay').focus();
+    $('#journey-announcement').textContent =
+      'Journey complete. Return to Earth to replay.';
   }
   renderer?.render(state, time);
   audio.update(state as TimedFrame);
@@ -427,6 +455,17 @@ function launch(direction: number) {
       `Flying to ${CHECKPOINTS[state.next].name}.`;
   }
 }
+$('#enter-horizon').addEventListener('click', () => {
+  clearInspection();
+  if (controller.enterHorizon(performance.now())) {
+    wheel.reset();
+    state = controller.snapshot();
+    updateUI();
+    $('#pause-flight').focus();
+    $('#journey-announcement').textContent =
+      'Horizon approach started. Illustrative twenty-second descent.';
+  }
+});
 $('#next').addEventListener('click', () => launch(1));
 $('#previous').addEventListener('click', () => launch(-1));
 $('#zoom-in').addEventListener('click', () => controller.zoomBy(0.95));

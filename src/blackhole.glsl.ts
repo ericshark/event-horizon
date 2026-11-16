@@ -12,6 +12,9 @@ export const fragmentShader = /* glsl */ `
 precision highp float;
 
 uniform vec2 uResolution;
+uniform float uOpacity;
+uniform float uDarkness;
+uniform vec2 uOffset;
 uniform float uTime;
 uniform vec3 uCamPos;
 uniform mat3 uCamBasis;
@@ -31,7 +34,7 @@ const float DISK_IN = 2.4;
 const float DISK_OUT = 11.0;
 const float TITLE_Z = -16.0;
 const float ESCAPE_R = 60.0;
-const int MAX_STEPS = 220;
+const int MAX_STEPS = 120;
 
 float hash13(vec3 p) {
   p = fract(p * 0.1031);
@@ -60,7 +63,7 @@ float noise(vec3 p) {
 float fbm(vec3 p) {
   float v = 0.0;
   float a = 0.5;
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 3; i++) {
     v += a * noise(p);
     p = p * 2.03 + vec3(1.7, 9.2, 4.1);
     a *= 0.5;
@@ -141,7 +144,8 @@ vec3 aces(vec3 x) {
 }
 
 void main() {
-  vec2 ndc = vUv * 2.0 - 1.0;
+  vec2 ndc = vUv * 2.0 - 1.0 + uOffset;
+  if (uDarkness >= 1.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, uOpacity); return; }
   float aspect = uResolution.x / uResolution.y;
   vec3 rd = normalize(uCamBasis * vec3(ndc.x * uTanHalfFov * aspect, ndc.y * uTanHalfFov, 1.0));
 
@@ -160,7 +164,7 @@ void main() {
 
   for (int i = 0; i < MAX_STEPS; i++) {
     float r = length(pos);
-    float dt = clamp(0.055 * r, 0.012, max(1.4, r * 0.08)) * uStepScale;
+    float dt = clamp(0.085 * r, 0.02, max(1.4, r * 0.08)) * uStepScale;
     if (i == 0) dt *= jitter;
 
     // Exact null-geodesic bending in Cartesian form: a = -1.5 h^2 x / r^5.
@@ -207,6 +211,6 @@ void main() {
 
 
 
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col * (1.0 - uDarkness), uOpacity);
 }
 `;

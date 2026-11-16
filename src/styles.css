@@ -1367,3 +1367,57 @@ body.timed-journey {
     bottom: 236px;
   }
 }
+
+/* The final scene recedes into darkness; the replay remains the sole primary action. */
+body[data-phase='interior'] #ending {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: min(580px, calc(100vw - 40px));
+  max-height: calc(100svh - 40px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: #000;
+  border: 0;
+  padding: 24px;
+}
+body[data-phase='interior'] #ending h2 {
+  letter-spacing: -0.035em;
+}
+body[data-phase='interior'] .fallback-body {
+  opacity: 0;
+}
+#enter-horizon {
+  border-color: #bc9972;
+}
+#horizon-radius {
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 759px) {
+  body[data-checkpoint='sagittarius-a'] #timed-navigation {
+    bottom: 150px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  body[data-checkpoint='sagittarius-a'] #inspection-hint {
+    flex-basis: 100%;
+  }
+  body[data-checkpoint='sagittarius-a'] #sound-toggle {
+    top: 110px;
+    bottom: auto;
+    background: #07131b;
+    opacity: 1;
+  }
+  body[data-checkpoint='sagittarius-a'] #cinematic-note {
+    font-size: 9px;
+    margin-top: 8px;
+  }
+}
+
+body[data-phase='interior'] #sound-toggle {
+  top: auto;
+  bottom: 20px;
+}

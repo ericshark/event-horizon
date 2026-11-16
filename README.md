@@ -38,8 +38,12 @@ Sagittarius A* uses approximately 4 million solar masses at 26,000 light-years,
 J2000 RA 17h45m40s, Dec −29°00′28″. The simplified nonrotating Schwarzschild model
 has a horizon radius of about 11.8 million km. The scientific observation point
 is offset from the centre by **1,000 horizon radii**. Optical framing is authored
-independently. The ring is illustrative; spin is omitted. Cinematic rendering
-and explicit horizon descent are assigned to EH-05 and are not yet available.
+independently. The lensed sky and bright accretion disk are illustrative; spin
+is omitted. Enter the event horizon explicitly starts a separate 20-second
+illustrative descent, with pause and finish controls. Horizon approach shows
+local radius instead of mph. The dark ending offers Return to Earth as a replay
+reset, retaining sound preferences. Wheel input and old stage links never start
+descent. See [EH-05 verification](docs/verification/eh-05.md).
 Sources: [NASA mass and distance](https://www.nasa.gov/image-article/supermassive-black-hole-sagittarius/),
 [Chandra coordinates](https://chandra.si.edu/photo/2026/sgrawind/index.html).
 

@@ -9,14 +9,15 @@ import {
   LEG_LENGTHS,
   pointAtDistance,
 } from './journey';
-import { clamp, norm, mix, type Vec } from './science';
+import { clamp, norm, mix, RS, type Vec } from './science';
 export interface CameraPose {
   position: Vec;
   rotation: [number, number, number, number];
 }
-export type Playback = 'observing' | 'flying' | 'paused';
+export type Playback = 'observing' | 'flying' | 'paused' | 'complete';
 export interface TimedFrame extends FlightState {
   playback: Playback;
+  sequence: 'route' | 'descent';
   elapsed: number;
   speedKmS: number;
   /** Normalised speed envelope, 0 at rest and 1 at the cruise plateau. */
@@ -81,6 +82,16 @@ export function schedule(elapsed: number, duration = 6) {
               : 'braking',
   } as const;
 }
+/** Authored illustrative descent: smooth log-radius, not a geodesic. */
+export const DESCENT_SECONDS = 20;
+export function descentRadius(seconds: number) {
+  const times = [0, 8, 15, 18, 20],
+    radii = [1000, 100, 1.5, 1, 0.8];
+  const t = Math.max(0, Math.min(DESCENT_SECONDS, seconds));
+  const i = Math.min(3, times.findIndex((end, j) => j > 0 && t <= end) - 1);
+  const u = quintic((t - times[i]) / (times[i + 1] - times[i]));
+  return Math.exp(Math.log(radii[i]) * (1 - u) + Math.log(radii[i + 1]) * u);
+}
 /** Per-leg [lift, sideways] swing in render units: Earth–Moon stays local, later legs sweep wider. */
 const ARCS: [number, number][] = [
   [7, 2],
@@ -126,6 +137,7 @@ function canonical(stop: number): CameraPose {
   );
 }
 export class JourneyController {
+  private sequence: 'route' | 'descent' = 'route';
   private stop = 0;
   private target = 1;
   private playback: Playback = 'observing';
@@ -140,6 +152,7 @@ export class JourneyController {
   private start = this.camera;
   private end = canonical(1);
   observe(stop: number) {
+    this.sequence = 'route';
     this.stop = Math.max(0, Math.min(CHECKPOINTS.length - 1, Math.floor(stop)));
     this.target = Math.min(CHECKPOINTS.length - 1, this.stop + 1);
     this.playback = 'observing';
@@ -148,6 +161,7 @@ export class JourneyController {
     this.resetView();
   }
   resetView() {
+    if (this.playback !== 'observing') return;
     this.yaw = this.pitch = 0;
     this.zoom = 1;
     this.drag = false;
@@ -203,6 +217,24 @@ export class JourneyController {
     this.velocity = [0, 0];
     return true;
   }
+  enterHorizon(now: number) {
+    if (
+      this.playback !== 'observing' ||
+      CHECKPOINTS[this.stop].kind !== 'blackhole'
+    )
+      return false;
+    this.start = {
+      position: [...this.camera.position],
+      rotation: [...this.camera.rotation],
+    };
+    this.sequence = 'descent';
+    this.elapsed = 0;
+    this.last = now;
+    this.playback = 'flying';
+    this.drag = false;
+    this.velocity = [0, 0];
+    return true;
+  }
   pause(now: number) {
     if (this.playback === 'flying') {
       this.tick(now);
@@ -216,16 +248,23 @@ export class JourneyController {
     }
   }
   skip() {
-    if (this.playback !== 'observing') this.observe(this.target);
+    if (this.sequence === 'descent') {
+      this.elapsed = DESCENT_SECONDS;
+      this.playback = 'complete';
+    } else if (this.playback !== 'observing') this.observe(this.target);
   }
   tick(now: number): TimedFrame {
     const dt = this.last === null ? 0 : Math.max(0, (now - this.last) / 1000);
     this.last = now;
     if (this.playback === 'flying') {
-      const duration = LEG_DURATIONS[Math.min(this.stop, this.target)];
+      const duration =
+        this.sequence === 'descent'
+          ? DESCENT_SECONDS
+          : LEG_DURATIONS[Math.min(this.stop, this.target)];
       this.elapsed = Math.min(duration, this.elapsed + dt);
       if (this.elapsed >= duration - 1e-10) {
-        this.observe(this.target);
+        if (this.sequence === 'descent') this.playback = 'complete';
+        else this.observe(this.target);
         this.last = now;
       }
     } else if (this.playback === 'observing' && !this.drag) {
@@ -235,7 +274,12 @@ export class JourneyController {
     return this.snapshot();
   }
   snapshot(): TimedFrame {
-    const observing = this.playback === 'observing',
+    return this.sequence === 'descent'
+      ? this.descentSnapshot()
+      : this.routeSnapshot();
+  }
+  private routeSnapshot(forceObservation = false): TimedFrame {
+    const observing = forceObservation || this.playback === 'observing',
       leg = Math.min(this.stop, this.target),
       timing = schedule(this.elapsed, LEG_DURATIONS[leg] ?? 6);
     const progress = observing
@@ -307,6 +351,7 @@ export class JourneyController {
       speedKmS,
       thrust: observing ? 0 : timing.thrust,
       scientificPosition,
+      sequence: 'route',
       playback: this.playback,
       elapsed: this.elapsed,
       cameraPose,
@@ -329,6 +374,68 @@ export class JourneyController {
     Object.freeze(cameraPose.rotation);
     Object.freeze(cameraPose);
     return Object.freeze(frame);
+  }
+  private descentSnapshot(): TimedFrame {
+    // Reuse the final observation's route quantities. Descent never adds Euclidean tour distance.
+    const playback = this.playback;
+    const base = this.routeSnapshot(true);
+    const radius = descentRadius(this.elapsed),
+      center: Vec = [0, 0, this.stop * SPACING];
+    const inward = canonical(this.stop);
+    const blend = quintic(this.elapsed / 2);
+    const rotation = new Quaternion(...this.start.rotation).slerp(
+      new Quaternion(...inward.rotation),
+      blend,
+    );
+    const startRange = norm(
+      this.start.position.map((n, i) => n - center[i]) as Vec,
+    );
+    const inspectionRange =
+      startRange * (1 - blend) + viewingRadius(this.stop) * blend;
+    const cameraPose: CameraPose = {
+      position: [...center],
+      rotation: rotation.toArray(),
+    };
+    const bh = CHECKPOINTS[this.stop].position;
+    const delta = base.scientificPosition.map((v, i) => v - bh[i]) as Vec;
+    const scientificPosition = bh.map(
+      (v, i) => v + (delta[i] * radius) / 1000,
+    ) as Vec;
+    const opticalRadius =
+      20 * Math.pow(radius / 1000, Math.log(20) / Math.log(1000));
+    const offset = new Vector3(
+      0,
+      0,
+      (inspectionRange * opticalRadius) / 20,
+    ).applyQuaternion(rotation);
+    cameraPose.position = center.map(
+      (n, i) => n + offset.getComponent(i),
+    ) as Vec;
+    Object.freeze(cameraPose.position);
+    Object.freeze(cameraPose.rotation);
+    Object.freeze(cameraPose);
+    Object.freeze(scientificPosition);
+    return Object.freeze({
+      ...base,
+      sequence: 'descent',
+      playback,
+      elapsed: this.elapsed,
+      bhRadius: radius,
+      approach: this.elapsed / DESCENT_SECONDS,
+      phase: playback === 'complete' ? 'interior' : 'blackhole',
+      flightPhase: 'observing',
+      scientificPosition,
+      earthKm: norm(scientificPosition),
+      rangeKm: Math.max(0, radius - 1) * RS,
+      localRangeKm: Math.max(0, radius - 1) * RS,
+      cameraPose,
+      cameraX: cameraPose.position[0],
+      cameraZ: cameraPose.position[2],
+      thrust: 0,
+      warp: 0,
+      speedKmS: 0,
+      next: this.stop,
+    });
   }
 }
 /** Wheel gesture ownership survives arrival; every wheel event extends the silence gate. */

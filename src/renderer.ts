@@ -11,6 +11,10 @@ import {
   Group,
   Material,
   Matrix4,
+  Matrix3,
+  Vector2,
+  PlaneGeometry,
+  Camera,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -26,7 +30,9 @@ import {
   TextureLoader,
   Vector3,
   WebGLRenderer,
+  WebGLRenderTarget,
 } from 'three';
+import { vertexShader, fragmentShader } from './blackhole.glsl';
 import { smooth } from './science';
 import { buildVoyager } from './voyager';
 import { SceneryLayers } from './scenery-layers';
@@ -52,8 +58,47 @@ const assets = new Map<string, Texture>();
 const SUN_FROM_FRONT = new Vector3(-4, 3, 5).normalize();
 const SUN_FROM_BEHIND = new Vector3(-4, 3, -5).normalize();
 export class JourneyRenderer {
+  private gl: WebGL2RenderingContext;
   private renderer: WebGLRenderer;
+  private gpuFence: WebGLSync | null = null;
+  private busyTicks = 0;
+  private drawnKey = '';
   private scene = new Scene();
+  private horizonScene = new Scene();
+  private horizonTarget = new WebGLRenderTarget(1, 1, { depthBuffer: false });
+  private horizonComposite = new Scene();
+  private horizonCompositeMaterial = new MeshBasicMaterial({
+    map: this.horizonTarget.texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+  });
+  private horizonCompositeQuad = new Mesh(
+    new PlaneGeometry(2, 2),
+    this.horizonCompositeMaterial,
+  );
+  private horizonCamera = new Camera();
+  private horizonMaterial = new ShaderMaterial({
+    vertexShader,
+    fragmentShader,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    uniforms: {
+      uResolution: { value: new Vector2() },
+      uTime: { value: 0 },
+      uCamPos: { value: new Vector3() },
+      uCamBasis: { value: new Matrix3() },
+      uTanHalfFov: { value: 0.36 },
+      uLensPos: { value: new Vector3() },
+      uLensMass: { value: 0 },
+      uStepScale: { value: 1 },
+      uOpacity: { value: 0 },
+      uDarkness: { value: 0 },
+      uOffset: { value: new Vector2() },
+    },
+  });
+  private horizonQuad = new Mesh(new PlaneGeometry(2, 2), this.horizonMaterial);
   private camera = new PerspectiveCamera(36, 1, 0.01, 500);
   private object = new Group();
   private sky: Points;
@@ -100,12 +145,15 @@ export class JourneyRenderer {
   /** Textures requested but not yet decoded; acceptance checks wait for zero. */
   pendingTextures = 0;
   private constructor(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext) {
+    this.gl = gl;
     this.renderer = new WebGLRenderer({
       canvas,
       context: gl,
       antialias: true,
       alpha: false,
     });
+    this.horizonScene.add(this.horizonQuad);
+    this.horizonComposite.add(this.horizonCompositeQuad);
     this.renderer.setClearColor('#020609');
     this.scene.add(new AmbientLight('#adc5df', 0.1));
     const sun = (this.sun = new DirectionalLight('#fff2df', 2.5));
@@ -475,10 +523,24 @@ export class JourneyRenderer {
       height = innerHeight;
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75) * this.scale);
     this.renderer.setSize(width, height, false);
+    // Bound ray integration cost independently of the crisp scene and HTML instruments.
+    const horizonWidth = Math.round(Math.min(width, 640) * this.scale);
+    this.horizonTarget.setSize(
+      horizonWidth,
+      Math.round((horizonWidth * height) / width),
+    );
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    this.drawnKey = '';
   }
-  render(s: FlightState & { thrust?: number }, time: number) {
+  render(
+    s: FlightState & {
+      thrust?: number;
+      playback?: string;
+      flightPhase?: string;
+    },
+    time: number,
+  ) {
     const thrust = s.thrust ?? 0;
     const mobile = innerWidth < 760;
     const originZ = s.now * SPACING;
@@ -527,7 +589,27 @@ export class JourneyRenderer {
     this.sky.position.copy(this.camera.position);
     this.background.position.copy(this.camera.position);
     this.background.rotation.y = 0.4 + time * 0.00004;
-    const handoff = 0;
+    const final = CHECKPOINTS.length - 1;
+    const handoff = smooth((s.position - (final - 0.28)) / 0.24);
+    const interior = s.phase === 'interior';
+    const descent = s.phase === 'blackhole' || interior;
+    const hu = this.horizonMaterial.uniforms;
+    hu.uResolution.value.set(innerWidth, innerHeight);
+    hu.uTime.value = time;
+    hu.uOpacity.value = handoff;
+    hu.uDarkness.value = descent ? 1 - smooth((s.bhRadius - 1) / 0.5) : 0;
+    // Authored optical magnification: 1,000 scientific radii frame at 20 shader radii.
+    const hp = new Vector3().fromArray(
+      s.cameraPose?.position ?? [0, 0, final * SPACING - 7],
+    );
+    hp.z -= final * SPACING;
+    hp.multiplyScalar(20 / 7).applyAxisAngle(new Vector3(1, 0, 0), 0.25);
+    hu.uCamPos.value.copy(hp);
+    const basis = new Matrix4().lookAt(hp, new Vector3(), new Vector3(0, 1, 0));
+    basis.scale(new Vector3(1, 1, -1));
+    hu.uCamBasis.value.setFromMatrix4(basis);
+    hu.uTanHalfFov.value = mobile ? 0.78 : 0.36;
+    hu.uOffset.value.set(mobile ? 0 : -0.2, mobile ? -0.48 : 0);
     (this.sky.material as PointsMaterial).opacity = 0.45 * (1 - handoff);
     this.background.visible = true;
     this.spinRate +=
@@ -643,14 +725,48 @@ export class JourneyRenderer {
           Math.abs(target.y) < 0.9,
       },
     };
+    let gpuBusy = false;
+    if (this.gpuFence) {
+      const status = this.gl.clientWaitSync(this.gpuFence, 0, 0);
+      if (status === this.gl.TIMEOUT_EXPIRED) {
+        gpuBusy = true;
+        this.busyTicks++;
+      } else {
+        this.gl.deleteSync(this.gpuFence);
+        this.gpuFence = null;
+        if (this.busyTicks >= 2) this.slow++;
+        this.busyTicks = 0;
+      }
+    }
+    const poseKey =
+      s.phase === 'orbit' || s.phase === 'flyby' || s.phase === 'blackhole'
+        ? `${s.cameraPose?.position.map((n) => n.toFixed(3)).join(',')}:${s.cameraPose?.rotation.map((n) => n.toFixed(3)).join(',')}`
+        : '';
+    const drawKey = `${s.now}:${s.next}:${s.playback ?? ''}:${s.flightPhase ?? ''}:${s.phase}:${Math.round(s.position * 5)}:${s.bhRadius.toFixed(1)}:${this.pendingTextures}:${poseKey}`;
+    if (gpuBusy && (s.playback === 'flying' || drawKey === this.drawnKey))
+      return;
+    this.drawnKey = drawKey;
     this.renderer.setClearColor('#020609');
     this.renderer.render(this.scene, this.camera);
+    if (handoff > 0) {
+      this.renderer.setRenderTarget(this.horizonTarget);
+      this.renderer.setClearColor('#000000', 0);
+      this.renderer.render(this.horizonScene, this.horizonCamera);
+      this.renderer.setRenderTarget(null);
+      this.renderer.autoClear = false;
+      this.renderer.render(this.horizonComposite, this.horizonCamera);
+      this.renderer.autoClear = true;
+      this.renderer.setClearColor('#020609', 1);
+    }
+    if (this.gpuFence) this.gl.deleteSync(this.gpuFence);
+    this.gpuFence = this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    this.gl.flush();
     this.frames++;
     const now = performance.now(),
       dt = this.last ? now - this.last : 16;
     this.last = now;
     if (dt > 50) this.slow++;
-    else this.slow = Math.max(0, this.slow - 1);
+    else if (!gpuBusy) this.slow = Math.max(0, this.slow - 1);
     if (this.slow > 8 && this.scale > 0.35) {
       this.scale = Math.max(0.35, this.scale - 0.15);
       this.slow = 0;
@@ -660,8 +776,14 @@ export class JourneyRenderer {
   resetTiming() {
     this.last = 0;
     this.slow = 0;
+    this.busyTicks = 0;
+    this.drawnKey = '';
   }
   dispose() {
+    if (this.gpuFence) {
+      this.gl.deleteSync(this.gpuFence);
+      this.gpuFence = null;
+    }
     for (const n of this.nodes.values()) {
       this.object = n.group;
       this.clear();
@@ -678,6 +800,11 @@ export class JourneyRenderer {
     (this.sky.material as PointsMaterial).dispose();
     assets.forEach((t) => t.dispose());
     assets.clear();
+    this.horizonQuad.geometry.dispose();
+    this.horizonMaterial.dispose();
+    this.horizonTarget.dispose();
+    this.horizonCompositeQuad.geometry.dispose();
+    this.horizonCompositeMaterial.dispose();
     this.renderer.dispose();
   }
 }
