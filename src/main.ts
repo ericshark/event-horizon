@@ -287,8 +287,6 @@ function updateTimedUI() {
   $('#inspection').inert = flying || !webgl;
   $('#inspection').setAttribute('aria-disabled', String(flying || !webgl));
   $('#playback-controls').hidden = !flying || complete;
-  $('#enter-horizon').hidden =
-    flying || CHECKPOINTS[s.now].kind !== 'blackhole';
   $('#skip-flight').textContent = descent ? 'Finish descent' : 'Skip flight';
   $('#skip-flight').setAttribute(
     'aria-description',
@@ -321,7 +319,10 @@ function updateTimedUI() {
       .join('');
   }
   $<HTMLButtonElement>('#previous').disabled = s.now === 0;
-  $<HTMLButtonElement>('#next').disabled = s.now === CHECKPOINTS.length - 1;
+  const atRouteEnd = s.now === CHECKPOINTS.length - 1;
+  $<HTMLButtonElement>('#next').disabled =
+    atRouteEnd && CHECKPOINTS[s.now].kind !== 'blackhole';
+  $('#next').dataset.action = atRouteEnd ? 'enter' : 'next';
   for (const id of ['zoom-in', 'zoom-out', 'reset-view'])
     $<HTMLButtonElement>(`#${id}`).disabled = !webgl;
   if (!webgl) {
@@ -331,10 +332,11 @@ function updateTimedUI() {
     $('#inspection-hint').innerHTML =
       '<span class="desktop-hint">Drag to explore · Scroll to travel</span><span class="mobile-hint">Drag to explore · Pinch to zoom</span>';
   }
-  $('#next').textContent =
-    s.now === CHECKPOINTS.length - 1
-      ? 'End of route'
-      : `Next · ${CHECKPOINTS[s.now + 1].name}`;
+  $('#next').textContent = atRouteEnd
+    ? CHECKPOINTS[s.now].kind === 'blackhole'
+      ? 'Enter the event horizon'
+      : 'End of route'
+    : `Next · ${CHECKPOINTS[s.now + 1].name}`;
   $('#pause-flight').textContent = s.playback === 'paused' ? 'Resume' : 'Pause';
   $('#playback-label').textContent =
     s.playback === 'paused' ? 'Paused' : flying ? 'In flight' : 'At rest';
@@ -402,7 +404,7 @@ function handlePlaybackTransition(
     const hash = `#${CHECKPOINTS[state.now].id}`;
     if (location.hash !== hash) history.pushState(null, '', hash);
     updateUI();
-    $(state.now === CHECKPOINTS.length - 1 ? '#previous' : '#next').focus();
+    $('#next').focus();
     $('#journey-announcement').textContent =
       `Arrived at ${CHECKPOINTS[state.now].name}.`;
   }
@@ -449,15 +451,13 @@ window.addEventListener('resize', () => {
   updateUI();
   renderer?.render(state, time);
 });
-window.addEventListener(
-  'pagehide',
-  () => {
-    gsap.ticker.remove(frame);
-    audio.dispose();
-    renderer?.dispose();
-  },
-  { once: true },
-);
+window.addEventListener('pagehide', (event) => {
+  // A persisted page may be restored from the back/forward cache; keep it alive.
+  if (event.persisted) return;
+  gsap.ticker.remove(frame);
+  audio.dispose();
+  renderer?.dispose();
+});
 controller.observe(resolveStop(location.hash.slice(1)));
 state = controller.snapshot();
 history.replaceState(null, '', `#${CHECKPOINTS[state.now].id}`);
@@ -590,7 +590,7 @@ function launch(direction: number) {
       `Flying to ${CHECKPOINTS[state.next].name}.`;
   }
 }
-$('#enter-horizon').addEventListener('click', () => {
+function enterHorizon() {
   clearInspection();
   if (controller.enterHorizon(performance.now())) {
     wheel.reset();
@@ -600,8 +600,10 @@ $('#enter-horizon').addEventListener('click', () => {
     $('#journey-announcement').textContent =
       'Horizon approach started. Illustrative twenty-second descent.';
   }
-});
-$('#next').addEventListener('click', () => launch(1));
+}
+$('#next').addEventListener('click', () =>
+  $('#next').dataset.action === 'enter' ? enterHorizon() : launch(1),
+);
 $('#previous').addEventListener('click', () => launch(-1));
 $('#zoom-in').addEventListener('click', () => {
   controller.zoomBy(0.95);

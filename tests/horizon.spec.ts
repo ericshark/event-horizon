@@ -55,8 +55,8 @@ test('all stops through visible controls, timed forward/reverse flights, inspect
     }
   }
   await expect(
-    page.getByRole('button', { name: 'End of route', exact: true }),
-  ).toBeDisabled();
+    page.getByRole('button', { name: 'Enter the event horizon', exact: true }),
+  ).toBeEnabled();
   await page.locator('#inspection').dispatchEvent('wheel', { deltaY: 200 });
   await page.clock.fastForward(1000);
   await expect(page.locator('body')).toHaveAttribute(

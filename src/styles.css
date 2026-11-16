@@ -1534,7 +1534,7 @@ body[data-phase='interior'] #ending h2 {
 body[data-phase='interior'] .fallback-body {
   opacity: 0;
 }
-#enter-horizon {
+#next[data-action='enter'] {
   border-color: #bc9972;
 }
 #horizon-radius {

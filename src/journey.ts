@@ -260,7 +260,7 @@ export const CHECKPOINTS: Checkpoint[] = [
       '13 / The heart of the Milky Way',
       'The invisible centre.',
       'At the centre of our galaxy, Sagittarius A* contains roughly four million solar masses. Nearby stars and glowing gas reveal this otherwise invisible supermassive black hole.',
-      'Approximate J2000 RA 17h45m40s, Dec −29°00′28″; distance 26,000 ly. Nonrotating Schwarzschild model omits spin. The bright ring is an illustration, not a visible-light photograph. Observation remains at 1,000 horizon radii; descent is not available yet.',
+      'Approximate J2000 RA 17h45m40s, Dec −29°00′28″; distance 26,000 ly. Nonrotating Schwarzschild model omits spin. The bright ring is an illustration, not a visible-light photograph. Observation begins at 1,000 horizon radii; the optional descent is an illustrative curved-spacetime view, not a measured local velocity.',
       'blackhole',
       RS,
       BH_MASS,
@@ -481,8 +481,8 @@ const additionalFacts: Record<string, [string, string][]> = {
   ],
   voyager: [
     ['Launch', '5 September 1977'],
+    ['Earth distance', '≈ 170 AU · estimated, grows daily'],
     ['Probe speed', '≈ 17 km/s · relative to Sun'],
-    ['High-gain dish', '3.7 m · booms shortened in model'],
   ],
   proxima: [
     ['Earth distance', '≈ 4.25 light-years'],
