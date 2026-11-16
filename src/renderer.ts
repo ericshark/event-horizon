@@ -54,15 +54,23 @@ import {
 } from './planet-materials';
 
 const assets = new Map<string, Texture>();
+export const LOAD_TIMEOUT_MS = 10_000;
 /** World-space directions towards the Sun for the Earth stop and every later stop. */
 const SUN_FROM_FRONT = new Vector3(-4, 3, 5).normalize();
 const SUN_FROM_BEHIND = new Vector3(-4, 3, -5).normalize();
 export class JourneyRenderer {
+  private canvas: HTMLCanvasElement;
   private gl: WebGL2RenderingContext;
   private renderer: WebGLRenderer;
+  private loseContextExt: {
+    loseContext: () => void;
+    restoreContext: () => void;
+  } | null = null;
   private gpuFence: WebGLSync | null = null;
   private busyTicks = 0;
   private drawnKey = '';
+  private pendingAssets = new Set<string>();
+  private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private scene = new Scene();
   private horizonScene = new Scene();
   private horizonTarget = new WebGLRenderTarget(1, 1, { depthBuffer: false });
@@ -124,8 +132,12 @@ export class JourneyRenderer {
   private background!: Mesh;
   diagnostics = {
     loaded: [] as number[],
+    textures: [] as string[],
     warp: 0,
     pending: 0,
+    quality: 0.85,
+    contextLost: false,
+    reducedMotion: false,
     camera: [0, 0, 0] as number[],
     yaw: 0,
     nodeIds: {} as Record<number, string>,
@@ -142,10 +154,34 @@ export class JourneyRenderer {
   private field?: Points;
   frames = 0;
   textureFailures = 0;
+  timedOutTextures = 0;
+  contextLost = false;
+  fallbackPinned = false;
+  onStatusChange?: () => void;
+  onContextLost?: () => void;
+  onContextRestored?: () => void;
   /** Textures requested but not yet decoded; acceptance checks wait for zero. */
   pendingTextures = 0;
+  private handleContextLost = (e: Event) => {
+    e.preventDefault();
+    this.contextLost = true;
+    this.gpuFence = null;
+    this.diagnostics.contextLost = true;
+    this.onContextLost?.();
+  };
+  private handleContextRestored = () => {
+    if (this.fallbackPinned) return;
+    this.contextLost = false;
+    this.drawnKey = '';
+    this.diagnostics.contextLost = false;
+    this.onContextRestored?.();
+  };
   private constructor(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext) {
+    this.canvas = canvas;
     this.gl = gl;
+    this.loseContextExt = gl.getExtension('WEBGL_lose_context');
+    canvas.addEventListener('webglcontextlost', this.handleContextLost);
+    canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
     this.renderer = new WebGLRenderer({
       canvas,
       context: gl,
@@ -191,7 +227,6 @@ export class JourneyRenderer {
     this.background = new Mesh(
       new SphereGeometry(180, 64, 32),
       new MeshBasicMaterial({
-        map: this.loadTexture('stars'),
         side: BackSide,
         color: '#243141',
         depthWrite: false,
@@ -233,7 +268,6 @@ export class JourneyRenderer {
     this.warpField.frustumCulled = false;
     this.warpField.renderOrder = 10;
     this.scene.add(this.warpField, this.scenery.group);
-    this.loadTexture('earth');
     this.resize();
   }
   static create(canvas: HTMLCanvasElement) {
@@ -250,28 +284,57 @@ export class JourneyRenderer {
   private loadTexture(name: string) {
     if (assets.has(name)) return assets.get(name)!;
     const spec = ASSETS[name];
-    this.pendingTextures++;
+    this.pendingAssets.add(name);
+    this.pendingTextures = this.pendingAssets.size;
+    document.documentElement.dataset.textures = 'loading';
+    let settled = false;
+    const clearTimer = () => {
+      const timer = this.timers.get(name);
+      if (timer !== undefined) clearTimeout(timer);
+      this.timers.delete(name);
+    };
+    const applyFallback = (timedOut = false) => {
+      if (settled) return;
+      settled = true;
+      clearTimer();
+      this.pendingAssets.delete(name);
+      this.pendingTextures = this.pendingAssets.size;
+      // Reserved for load failures or 10 s timeout: a flat placeholder keeps the scene alive.
+      this.textureFailures++;
+      if (timedOut) this.timedOutTextures++;
+      document.documentElement.dataset.textureFallback = 'true';
+      if (this.pendingTextures === 0 && this.nodes.size > 0)
+        document.documentElement.dataset.textures = 'ready';
+      const fallback = document.createElement('canvas');
+      fallback.width = 4;
+      fallback.height = 2;
+      const ctx = fallback.getContext('2d')!;
+      ctx.fillStyle = spec.fallback;
+      ctx.fillRect(0, 0, 4, 2);
+      (texture.source as { data: unknown }).data = fallback;
+      texture.needsUpdate = true;
+      this.drawnKey = '';
+      this.onStatusChange?.();
+    };
     const texture = this.loader.load(
       `/textures/${name}.${spec.ext}`,
       () => {
-        this.pendingTextures--;
-        document.documentElement.dataset.textures = 'ready';
+        if (settled) return;
+        settled = true;
+        clearTimer();
+        this.pendingAssets.delete(name);
+        this.pendingTextures = this.pendingAssets.size;
+        if (this.pendingTextures === 0 && this.nodes.size > 0)
+          document.documentElement.dataset.textures = 'ready';
+        this.drawnKey = '';
+        this.onStatusChange?.();
       },
       undefined,
-      () => {
-        this.pendingTextures--;
-        // Reserved for load failures: a flat placeholder keeps the scene alive.
-        this.textureFailures++;
-        document.documentElement.dataset.textureFallback = 'true';
-        const fallback = document.createElement('canvas');
-        fallback.width = 4;
-        fallback.height = 2;
-        const ctx = fallback.getContext('2d')!;
-        ctx.fillStyle = spec.fallback;
-        ctx.fillRect(0, 0, 4, 2);
-        (texture.source as { data: unknown }).data = fallback;
-        texture.needsUpdate = true;
-      },
+      () => applyFallback(false),
+    );
+    this.timers.set(
+      name,
+      setTimeout(() => applyFallback(true), LOAD_TIMEOUT_MS),
     );
     texture.colorSpace = spec.linear ? NoColorSpace : SRGBColorSpace;
     texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
@@ -283,13 +346,46 @@ export class JourneyRenderer {
     const keep = residentAssets(leg);
     for (const [name, texture] of assets)
       if (!keep.has(name)) {
+        const timer = this.timers.get(name);
+        if (timer !== undefined) clearTimeout(timer);
+        this.timers.delete(name);
+        this.pendingAssets.delete(name);
         texture.dispose();
         assets.delete(name);
       }
+    this.pendingTextures = this.pendingAssets.size;
+    if (this.pendingTextures === 0)
+      document.documentElement.dataset.textures = 'ready';
+  }
+  loseContext() {
+    this.fallbackPinned = false;
+    this.canvas.dispatchEvent(
+      new Event('webglcontextlost', { cancelable: true }),
+    );
+  }
+  restoreContext() {
+    this.fallbackPinned = false;
+    try {
+      if (this.loseContextExt && this.gl.isContextLost()) {
+        this.loseContextExt.restoreContext();
+      }
+    } catch {
+      /* synthetic recovery */
+    }
+    this.canvas.dispatchEvent(new Event('webglcontextrestored'));
+  }
+  useStaticFallback() {
+    this.fallbackPinned = true;
+    this.contextLost = true;
+    this.diagnostics.contextLost = true;
+    this.onStatusChange?.();
   }
   /** Adaptive-quality hook (EH-06): scales the render resolution without touching flight state. */
   setQuality(scale: number) {
     this.scale = Math.max(0.35, Math.min(1, scale));
+    this.slow = 0;
+    this.busyTicks = 0;
+    this.diagnostics.quality = this.scale;
     this.resize();
   }
   get quality() {
@@ -538,10 +634,12 @@ export class JourneyRenderer {
       thrust?: number;
       playback?: string;
       flightPhase?: string;
+      reducedMotion?: boolean;
     },
     time: number,
   ) {
     const thrust = s.thrust ?? 0;
+    const reduced = Boolean(s.reducedMotion);
     const mobile = innerWidth < 760;
     const originZ = s.now * SPACING;
     const leg = Math.min(CHECKPOINTS.length - 1, Math.floor(s.position));
@@ -551,6 +649,13 @@ export class JourneyRenderer {
       (a, b) => Math.abs(a - s.now) - Math.abs(b - s.now),
     ))
       this.setCheckpoint(i);
+    const bgMat = this.background.material as MeshBasicMaterial;
+    if (!bgMat.map) {
+      bgMat.map = this.loadTexture('stars');
+      bgMat.needsUpdate = true;
+    }
+    if (this.pendingTextures === 0 && this.nodes.size > 0)
+      document.documentElement.dataset.textures = 'ready';
     let removed = false;
     for (const [i, node] of this.nodes) {
       if (!resident.includes(i)) {
@@ -565,8 +670,8 @@ export class JourneyRenderer {
     }
     if (removed) this.releaseUnusedTextures(leg);
     this.camera.fov = s.cameraPose
-      ? 40 + fovExpansion(s.leg, s.warp, thrust)
-      : 36 + 24 * smooth(s.position / 0.15);
+      ? 40 + fovExpansion(s.leg, s.warp, thrust, reduced)
+      : 36 + (reduced ? 0 : 24 * smooth(s.position / 0.15));
     if (mobile) this.camera.fov = s.cameraPose ? 100 : 75;
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
@@ -588,14 +693,14 @@ export class JourneyRenderer {
     );
     this.sky.position.copy(this.camera.position);
     this.background.position.copy(this.camera.position);
-    this.background.rotation.y = 0.4 + time * 0.00004;
+    this.background.rotation.y = reduced ? 0.4 : 0.4 + time * 0.00004;
     const final = CHECKPOINTS.length - 1;
     const handoff = smooth((s.position - (final - 0.28)) / 0.24);
     const interior = s.phase === 'interior';
     const descent = s.phase === 'blackhole' || interior;
     const hu = this.horizonMaterial.uniforms;
     hu.uResolution.value.set(innerWidth, innerHeight);
-    hu.uTime.value = time;
+    hu.uTime.value = reduced ? 0 : time;
     hu.uOpacity.value = handoff;
     hu.uDarkness.value = descent ? 1 - smooth((s.bhRadius - 1) / 0.5) : 0;
     // Authored optical magnification: 1,000 scientific radii frame at 20 shader radii.
@@ -613,7 +718,7 @@ export class JourneyRenderer {
     (this.sky.material as PointsMaterial).opacity = 0.45 * (1 - handoff);
     this.background.visible = true;
     this.spinRate +=
-      ((s.dragging ? 0 : 1) - this.spinRate) *
+      ((s.dragging || reduced ? 0 : 1) - this.spinRate) *
       (1 - Math.exp(-Math.max(0, time - this.spinTime) * 5));
     // The stop being approached takes over the light once it dominates the view.
     const litStop = s.cameraPose && s.legProgress > 0.5 ? s.next : s.now;
@@ -663,7 +768,7 @@ export class JourneyRenderer {
       });
       if (node.body) {
         // Integrate local spin so releasing a drag cannot jump to a wall-clock angle.
-        if (!s.dragging)
+        if (!s.dragging && !reduced)
           node.body.rotation.y +=
             (Math.min(0.05, Math.max(0, time - this.spinTime)) *
               Math.PI *
@@ -674,10 +779,11 @@ export class JourneyRenderer {
           node.body.material instanceof ShaderMaterial &&
           node.body.material.uniforms.time
         )
-          node.body.material.uniforms.time.value = time;
+          node.body.material.uniforms.time.value = reduced ? 0 : time;
       }
-      if (node.clouds) node.clouds.rotation.y = (time * Math.PI * 2) / 140;
-      if (node.field) node.field.rotation.y = time * 0.008;
+      if (node.clouds && !reduced)
+        node.clouds.rotation.y = (time * Math.PI * 2) / 140;
+      if (node.field && !reduced) node.field.rotation.y = time * 0.008;
     }
     this.spinTime = time;
     this.warpField.position.copy(this.camera.position);
@@ -692,13 +798,11 @@ export class JourneyRenderer {
       s.position,
       (innerHeight * this.renderer.getPixelRatio() * 0.5) /
         Math.tan((this.camera.fov * Math.PI) / 360),
+      reduced,
     );
-    this.warpField.visible = s.position > 0.1;
-    this.warpMaterial.uniforms.uWarp.value = streakStrength(
-      s.leg,
-      s.warp,
-      thrust,
-    );
+    const streaks = streakStrength(s.leg, s.warp, thrust, reduced);
+    this.warpField.visible = !reduced && s.position > 0.1 && streaks > 0;
+    this.warpMaterial.uniforms.uWarp.value = streaks;
     this.warpMaterial.uniforms.uTravel.value = s.position;
     this.warpMaterial.uniforms.uDirection.value = s.direction;
     const target = new Vector3(0, 0, s.next * SPACING - originZ).project(
@@ -706,8 +810,12 @@ export class JourneyRenderer {
     );
     this.diagnostics = {
       loaded: [...this.nodes.keys()],
-      warp: s.warp,
+      textures: [...assets.keys()],
+      warp: reduced ? 0 : s.warp,
       pending: this.pendingTextures,
+      quality: this.scale,
+      contextLost: this.contextLost,
+      reducedMotion: reduced,
       scenery: this.scenery.weights,
       fov: this.camera.fov,
       camera: this.camera.position.toArray(),
@@ -725,6 +833,7 @@ export class JourneyRenderer {
           Math.abs(target.y) < 0.9,
       },
     };
+    if (this.contextLost) return;
     let gpuBusy = false;
     if (this.gpuFence) {
       const status = this.gl.clientWaitSync(this.gpuFence, 0, 0);
@@ -742,7 +851,7 @@ export class JourneyRenderer {
       s.phase === 'orbit' || s.phase === 'flyby' || s.phase === 'blackhole'
         ? `${s.cameraPose?.position.map((n) => n.toFixed(3)).join(',')}:${s.cameraPose?.rotation.map((n) => n.toFixed(3)).join(',')}`
         : '';
-    const drawKey = `${s.now}:${s.next}:${s.playback ?? ''}:${s.flightPhase ?? ''}:${s.phase}:${Math.round(s.position * 5)}:${s.bhRadius.toFixed(1)}:${this.pendingTextures}:${poseKey}`;
+    const drawKey = `${s.now}:${s.next}:${s.playback ?? ''}:${s.flightPhase ?? ''}:${s.phase}:${Math.round(s.position * 5)}:${s.bhRadius.toFixed(1)}:${this.pendingTextures}:${reduced}:${poseKey}`;
     if (gpuBusy && (s.playback === 'flying' || drawKey === this.drawnKey))
       return;
     this.drawnKey = drawKey;
@@ -761,7 +870,7 @@ export class JourneyRenderer {
     if (this.gpuFence) this.gl.deleteSync(this.gpuFence);
     this.gpuFence = this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
     this.gl.flush();
-    this.frames++;
+    if (this.pendingTextures === 0) this.frames++;
     const now = performance.now(),
       dt = this.last ? now - this.last : 16;
     this.last = now;
@@ -780,7 +889,15 @@ export class JourneyRenderer {
     this.drawnKey = '';
   }
   dispose() {
-    if (this.gpuFence) {
+    this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
+    this.canvas.removeEventListener(
+      'webglcontextrestored',
+      this.handleContextRestored,
+    );
+    for (const timer of this.timers.values()) clearTimeout(timer);
+    this.timers.clear();
+    this.pendingAssets.clear();
+    if (this.gpuFence && !this.contextLost) {
       this.gl.deleteSync(this.gpuFence);
       this.gpuFence = null;
     }

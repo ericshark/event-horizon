@@ -15,6 +15,13 @@ export interface CameraPose {
   rotation: [number, number, number, number];
 }
 export type Playback = 'observing' | 'flying' | 'paused' | 'complete';
+export type MotionMode = 'system' | 'full' | 'reduced';
+export function resolveReducedMotion(
+  mode: MotionMode,
+  systemReduced: boolean,
+): boolean {
+  return mode === 'reduced' ? true : mode === 'full' ? false : systemReduced;
+}
 export interface TimedFrame extends FlightState {
   playback: Playback;
   sequence: 'route' | 'descent';
@@ -32,6 +39,8 @@ export interface TimedFrame extends FlightState {
     | 'braking'
     | 'settling';
   dragging: boolean;
+  motionMode: MotionMode;
+  reducedMotion: boolean;
 }
 const quintic = (x: number) => {
   const t = clamp(x);
@@ -148,9 +157,26 @@ export class JourneyController {
   private zoom = 1;
   private drag = false;
   private velocity = [0, 0];
+  private motionMode: MotionMode = 'system';
+  private systemReduced = false;
   private camera = canonical(0);
   private start = this.camera;
   private end = canonical(1);
+  get currentMotionMode(): MotionMode {
+    return this.motionMode;
+  }
+  get reducedMotion(): boolean {
+    return resolveReducedMotion(this.motionMode, this.systemReduced);
+  }
+  setMotionMode(mode: MotionMode, systemReduced = this.systemReduced) {
+    this.motionMode = mode;
+    this.systemReduced = systemReduced;
+    if (this.reducedMotion) this.velocity = [0, 0];
+  }
+  setSystemReducedMotion(systemReduced: boolean) {
+    this.systemReduced = systemReduced;
+    if (this.reducedMotion) this.velocity = [0, 0];
+  }
   observe(stop: number) {
     this.sequence = 'route';
     this.stop = Math.max(0, Math.min(CHECKPOINTS.length - 1, Math.floor(stop)));
@@ -189,9 +215,11 @@ export class JourneyController {
     if (value) this.velocity = [0, 0];
   }
   fling(dx: number, dy: number) {
+    const scale = this.reducedMotion ? 0.2 : 1,
+      limit = this.reducedMotion ? 0.25 : 1;
     this.velocity = [
-      Math.max(-1, Math.min(1, dx)),
-      Math.max(-1, Math.min(1, dy)),
+      Math.max(-limit, Math.min(limit, dx * scale)),
+      Math.max(-limit, Math.min(limit, dy * scale)),
     ];
   }
   zoomBy(factor: number) {
@@ -269,7 +297,8 @@ export class JourneyController {
       }
     } else if (this.playback === 'observing' && !this.drag) {
       this.inspect(this.velocity[0] * dt, this.velocity[1] * dt);
-      this.velocity = this.velocity.map((v) => v * Math.exp(-8 * dt));
+      const decay = this.reducedMotion ? 24 : 8;
+      this.velocity = this.velocity.map((v) => v * Math.exp(-decay * dt));
     }
     return this.snapshot();
   }
@@ -309,7 +338,9 @@ export class JourneyController {
             ? mix(b, this.end.position, quintic((u - 0.85) / 0.15))
             : mix(a, b, quintic((u - 0.15) / 0.7));
       if (u >= 0.15 && u <= 0.85) {
-        const swell = Math.sin((Math.PI * (u - 0.15)) / 0.7) ** 2,
+        const swell =
+            Math.sin((Math.PI * (u - 0.15)) / 0.7) ** 2 *
+            (this.reducedMotion ? 0.35 : 1),
           arc = ARCS[leg % ARCS.length];
         p[1] += arc[0] * swell;
         p[0] += arc[1] * swell;
@@ -366,8 +397,10 @@ export class JourneyController {
           ? 'turn'
           : 'transit',
       direction: Math.sign(this.target - this.stop),
-      warp: observing ? 0 : 0.075 * timing.rate * 3,
+      warp: observing || this.reducedMotion ? 0 : 0.075 * timing.rate * 3,
       dragging: this.drag,
+      motionMode: this.motionMode,
+      reducedMotion: this.reducedMotion,
     };
     Object.freeze(scientificPosition);
     Object.freeze(cameraPose.position);

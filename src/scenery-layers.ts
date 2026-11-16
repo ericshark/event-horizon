@@ -137,7 +137,13 @@ export class SceneryLayers {
     }
   }
   /** `travel` is the journey position; `scale` converts world size to pixels. */
-  update(at: Vector3, scenery: Scenery, travel: number, scale: number) {
+  update(
+    at: Vector3,
+    scenery: Scenery,
+    travel: number,
+    scale: number,
+    reduced = false,
+  ) {
     this.group.position.copy(at);
     // Interstellar stars thicken towards the galactic centre.
     const stars = scenery.interstellar * (0.45 + 0.55 * scenery.galactic);
@@ -145,7 +151,7 @@ export class SceneryLayers {
       const weight = spec.key === 'interstellar' ? stars : scenery[spec.key];
       points.visible = weight > 0.002;
       material.uniforms.uOpacity.value = weight * spec.opacity;
-      material.uniforms.uTravel.value = travel;
+      material.uniforms.uTravel.value = reduced ? 0 : travel;
       material.uniforms.uScale.value = scale;
     }
   }

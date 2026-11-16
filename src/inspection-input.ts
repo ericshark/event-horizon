@@ -3,6 +3,7 @@ import { JourneyController } from './controller';
 export function inspectionInput(
   region: HTMLElement,
   controller: JourneyController,
+  onChange?: () => void,
 ) {
   const pointers = new Map<number, { x: number; y: number }>();
   let separation = 0,
@@ -11,6 +12,7 @@ export function inspectionInput(
     pointers.clear();
     separation = 0;
     controller.setDragging(false);
+    controller.fling(0, 0);
   };
   region.addEventListener('pointerdown', (e) => {
     if (controller.snapshot().playback !== 'observing') return;
@@ -31,11 +33,13 @@ export function inspectionInput(
       const dt = Math.max(0.016, (e.timeStamp - previousTime) / 1000);
       controller.fling(dx / dt, dy / dt);
       previousTime = e.timeStamp;
+      onChange?.();
     } else {
       const [a, b] = [...pointers.values()],
         next = Math.hypot(a.x - b.x, a.y - b.y);
       if (separation && next) controller.zoomBy(separation / next);
       separation = next;
+      onChange?.();
     }
   });
   region.addEventListener('pointerup', (e) => {
@@ -48,6 +52,7 @@ export function inspectionInput(
     if (pointers.has(e.pointerId)) clear();
   });
   region.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     const keys: Record<string, () => void> = {
       ArrowLeft: () => controller.inspect(-0.12, 0),
       ArrowRight: () => controller.inspect(0.12, 0),
@@ -56,11 +61,14 @@ export function inspectionInput(
       '+': () => controller.zoomBy(0.95),
       '=': () => controller.zoomBy(0.95),
       '-': () => controller.zoomBy(1.05),
+      _: () => controller.zoomBy(1.05),
       Home: () => controller.resetView(),
+      '0': () => controller.resetView(),
     };
     if (keys[e.key]) {
       e.preventDefault();
       keys[e.key]();
+      onChange?.();
     }
   });
   return clear;

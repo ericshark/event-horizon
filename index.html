@@ -122,16 +122,29 @@
       <button id="pause-flight" type="button">Pause</button
       ><button id="skip-flight" type="button">Skip flight</button>
     </div>
-    <button
-      id="sound-toggle"
-      type="button"
-      aria-pressed="false"
-      data-state="off"
-      hidden
+    <div
+      id="preference-controls"
+      role="group"
+      aria-label="Motion and sound preferences"
     >
-      <span class="sound-icon" aria-hidden="true"></span
-      ><span id="sound-label">Sound off</span>
-    </button>
+      <label class="motion-control" for="motion-mode"
+        ><span class="motion-label">Motion</span
+        ><select id="motion-mode" aria-label="Motion preference">
+          <option value="system">System</option>
+          <option value="full">Full</option>
+          <option value="reduced">Reduced</option>
+        </select></label
+      ><button
+        id="sound-toggle"
+        type="button"
+        aria-pressed="false"
+        data-state="off"
+        hidden
+      >
+        <span class="sound-icon" aria-hidden="true"></span
+        ><span id="sound-label">Sound off</span>
+      </button>
+    </div>
     <p
       id="journey-announcement"
       class="sr-only"
@@ -203,8 +216,9 @@
       <h2 id="sources-title">Sources &amp; methodology</h2>
       <p>
         This is a guided illustration, not a mission trajectory. Object sizes,
-        spacing, rotation and transit time are rescaled for readability. Full
-        animation is independent of OS motion settings.
+        spacing, rotation and transit time are rescaled for readability. Motion
+        defaults to the system preference and can be set to System, Full, or
+        Reduced at any time.
       </p>
       <details open>
         <summary>Reference snapshot · 29 October 2026</summary>
@@ -252,7 +266,8 @@
           model gives a horizon radius of about 11.8 million km. The scientific
           observation radius is 1,000 horizon radii; optical framing is rescaled
           independently. Spin is omitted. The bright ring is an illustration,
-          not a visible-light photograph. Horizon descent is not available yet.
+          not a visible-light photograph. The twenty-second horizon descent and
+          dark interior are illustrative.
         </p>
         <a
           href="https://www.nasa.gov/image-article/supermassive-black-hole-sagittarius/"
@@ -325,7 +340,20 @@
         >
       </details>
     </dialog>
-    <p id="render-status" class="render-status" role="status"></p>
+    <div
+      id="render-notice"
+      class="render-status"
+      role="status"
+      aria-live="polite"
+    >
+      <p id="render-status"></p>
+      <div id="context-actions" hidden>
+        <button id="restore-webgl" type="button">Restore 3D view</button>
+        <button id="continue-fallback" type="button">
+          Continue with static illustration
+        </button>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

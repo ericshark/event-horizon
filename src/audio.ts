@@ -25,7 +25,7 @@ export function audioTargets(
   frame: Pick<
     TimedFrame,
     'playback' | 'thrust' | 'flightPhase' | 'elapsed' | 'leg'
-  >,
+  > & { reducedMotion?: boolean },
   enabled: boolean,
   visible = true,
 ): AudioTargets {
@@ -36,11 +36,12 @@ export function audioTargets(
       ? clamp((frame.elapsed - (duration - settle)) / settle)
       : 0;
   const thrust = ease(frame.thrust);
+  const reduced = Boolean(frame.reducedMotion);
   return {
     master: enabled && visible && frame.playback !== 'paused' ? 1 : 0,
-    bed: 0.5 + 0.2 * thrust,
-    drive: thrust ** 1.4,
-    driveHz: 160 + 760 * thrust,
+    bed: 0.5 + (reduced ? 0.1 : 0.2) * thrust,
+    drive: (reduced ? 0.5 : 1) * thrust ** 1.4,
+    driveHz: 160 + (reduced ? 340 : 760) * thrust,
     arrival: Math.sin(Math.PI * settling) ** 2,
   };
 }

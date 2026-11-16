@@ -63,13 +63,25 @@ export function sceneryAt(earthKm: number, position: number): Scenery {
  * interstellar legs follow the thrust envelope so streaks build and decay with the
  * same eased speed as everything else instead of staying nearly invisible.
  */
-export function streakStrength(leg: number, warp: number, thrust: number) {
+export function streakStrength(
+  leg: number,
+  warp: number,
+  thrust: number,
+  reducedMotion = false,
+) {
+  if (reducedMotion) return 0;
   if (leg < FIRST_INTERSTELLAR_STOP)
     return warp * Math.min(1, 0.25 + 0.18 * leg);
   return thrust * [0.1, 0.13, 0.16][Math.min(2, leg - FIRST_INTERSTELLAR_STOP)];
 }
 /** Restrained field-of-view expansion in degrees. */
-export function fovExpansion(leg: number, warp: number, thrust: number) {
+export function fovExpansion(
+  leg: number,
+  warp: number,
+  thrust: number,
+  reducedMotion = false,
+) {
+  if (reducedMotion) return 0;
   return leg < FIRST_INTERSTELLAR_STOP
     ? warp * 8
     : thrust * [2.5, 3, 3.5][Math.min(2, leg - FIRST_INTERSTELLAR_STOP)];

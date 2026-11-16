@@ -421,9 +421,14 @@ dialog {
   font-size: 13px;
   line-height: 1.8;
 }
+dialog:modal {
+  overscroll-behavior: contain;
+}
 dialog::backdrop {
   background: #000b;
   backdrop-filter: blur(10px);
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 .dialog-top {
   display: flex;
@@ -1311,12 +1316,52 @@ body.timed-journey {
   overflow: hidden;
 }
 
-/* Discreet sound control: present at rest and in transit, never inert. */
-#sound-toggle {
+/* Discreet motion and sound controls: present at rest and in transit, never inert. */
+#preference-controls {
   position: fixed;
   z-index: 8;
   right: 4vw;
-  bottom: 96px;
+  bottom: 108px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.motion-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a9bcc8;
+  background: rgba(4, 9, 14, 0.65);
+  border: 1px solid rgba(190, 215, 235, 0.22);
+  border-radius: 999px;
+  padding: 0 6px 0 12px;
+  min-height: 44px;
+}
+.motion-control:focus-within {
+  outline: 2px solid #cfe6ff;
+  outline-offset: 2px;
+}
+#motion-mode {
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  min-height: 44px;
+  min-width: 68px;
+  padding: 0 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+#motion-mode:focus-visible {
+  outline: none;
+}
+#motion-mode option {
+  background: #050e16;
+  color: var(--ink);
+}
+#sound-toggle {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1325,14 +1370,14 @@ body.timed-journey {
   padding: 0 14px;
   border: 1px solid rgba(190, 215, 235, 0.22);
   border-radius: 999px;
-  background: rgba(4, 9, 14, 0.55);
+  background: rgba(4, 9, 14, 0.65);
   color: #a9bcc8;
   font: inherit;
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  opacity: 0.72;
+  opacity: 0.85;
   transition:
     opacity 200ms ease,
     border-color 200ms ease;
@@ -1361,10 +1406,110 @@ body.timed-journey {
 #sound-toggle[data-state='on'] .sound-icon {
   background: currentColor;
 }
-@media (max-width: 760px) {
-  #sound-toggle {
+#playback-controls {
+  bottom: 162px;
+}
+.render-status {
+  bottom: 218px;
+}
+#render-notice {
+  pointer-events: none;
+}
+#render-status {
+  margin: 0;
+}
+#context-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  pointer-events: auto;
+}
+#context-actions button {
+  background: #081824ee;
+  border: 1px solid #6b95a8;
+  border-radius: 3px;
+  color: var(--ink);
+  font-size: 10px;
+  padding: 6px 10px;
+  min-height: 44px;
+  min-width: 44px;
+}
+.brand,
+#replay,
+.panel-actions a,
+.panel-actions button,
+.masthead button,
+.masthead select,
+.dialog-top button,
+dialog summary,
+dialog a,
+#cluster-list a {
+  min-height: 44px;
+  min-width: 44px;
+}
+.brand,
+#replay,
+.panel-actions a,
+dialog summary,
+dialog a {
+  display: inline-flex;
+  align-items: center;
+}
+html[data-motion='reduced'] .fallback-body {
+  animation: none !important;
+}
+html[data-motion='reduced'] .digit {
+  filter: none !important;
+}
+@media (max-width: 759px) {
+  .masthead {
+    padding: 10px 20px;
+  }
+  .masthead nav > label {
+    top: 56px;
+    left: 20px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .masthead select {
+    max-width: 122px;
+    padding: 6px 8px;
+    margin-left: 4px;
+  }
+  .masthead button {
+    padding: 0 8px;
+  }
+  #preference-controls {
+    top: 56px;
+    bottom: auto;
     right: 20px;
-    bottom: 236px;
+    gap: 4px;
+  }
+  .motion-control {
+    padding: 0 4px 0 8px;
+    font-size: 8px;
+    gap: 3px;
+  }
+  .motion-label {
+    display: none;
+  }
+  #motion-mode {
+    min-width: 58px;
+    font-size: 9px;
+    padding: 0 2px;
+  }
+  #sound-toggle {
+    padding: 0 10px;
+    font-size: 9px;
+    gap: 5px;
+  }
+  .timed-journey .render-status {
+    top: 104px;
+    bottom: auto;
+    left: 20px;
+    right: 20px;
+    max-width: none;
   }
 }
 
@@ -1405,19 +1550,13 @@ body[data-phase='interior'] .fallback-body {
   body[data-checkpoint='sagittarius-a'] #inspection-hint {
     flex-basis: 100%;
   }
-  body[data-checkpoint='sagittarius-a'] #sound-toggle {
-    top: 110px;
-    bottom: auto;
-    background: #07131b;
-    opacity: 1;
-  }
   body[data-checkpoint='sagittarius-a'] #cinematic-note {
     font-size: 9px;
     margin-top: 8px;
   }
 }
 
-body[data-phase='interior'] #sound-toggle {
+body[data-phase='interior'] #preference-controls {
   top: auto;
   bottom: 20px;
 }

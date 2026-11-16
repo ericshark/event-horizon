@@ -1,6 +1,11 @@
 import '@fontsource-variable/jetbrains-mono/wght.css';
 import './styles.css';
-import { JourneyController, WheelIntent, type TimedFrame } from './controller';
+import {
+  JourneyController,
+  WheelIntent,
+  type MotionMode,
+  type TimedFrame,
+} from './controller';
 import { RollingDigits, mph, earthDistance } from './instruments';
 import { inspectionInput } from './inspection-input';
 import { gsap } from 'gsap';
@@ -36,6 +41,28 @@ document.documentElement.classList.add(renderer ? 'has-webgl' : 'no-webgl');
 const audio = new AudioEngine(),
   controller = new JourneyController(),
   wheel = new WheelIntent();
+const MOTION_KEY = 'event-horizon.motion';
+const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
+function readMotionMode(): MotionMode {
+  try {
+    const saved = localStorage.getItem(MOTION_KEY);
+    if (saved === 'system' || saved === 'full' || saved === 'reduced')
+      return saved;
+  } catch {
+    /* storage unavailable */
+  }
+  return 'system';
+}
+function writeMotionMode(mode: MotionMode) {
+  try {
+    localStorage.setItem(MOTION_KEY, mode);
+  } catch {
+    /* storage unavailable */
+  }
+}
+controller.setMotionMode(readMotionMode(), reducedQuery.matches);
+const motionSelect = $<HTMLSelectElement>('#motion-mode');
+motionSelect.value = controller.currentMotionMode;
 const digits = new RollingDigits($('#speed-digits'));
 const maximumMph = Math.max(
   ...LEG_LENGTHS.map((length, i) => {
@@ -53,7 +80,10 @@ document.documentElement.style.setProperty(
   '--speed-width',
   `${Math.ceil(maximumMph).toLocaleString('en-US').length}ch`,
 );
-const clearInspection = inspectionInput($('#inspection'), controller);
+const clearInspection = inspectionInput($('#inspection'), controller, () => {
+  state = controller.snapshot();
+  renderer?.render(state, time);
+});
 
 let state: TimedFrame = controller.snapshot(),
   time = 0,
@@ -83,6 +113,7 @@ async function go(id: string, record = true, fade = true) {
   }
   state = controller.snapshot();
   updateUI();
+  renderer?.render(state, time);
   const hash = `#${CHECKPOINTS[state.now].id}`;
   if (record && location.hash !== hash) history.pushState(null, '', hash);
   else history.replaceState(null, '', hash);
@@ -228,6 +259,9 @@ function updateAxis() {
     )
     .join('');
 }
+function isWebglActive() {
+  return Boolean(renderer && !renderer.contextLost && !renderer.fallbackPinned);
+}
 function updateTimedUI() {
   document.body.classList.add('timed-journey');
   $('#observation-facts').hidden = false;
@@ -236,18 +270,32 @@ function updateTimedUI() {
   const s = state as TimedFrame,
     complete = s.playback === 'complete',
     descent = s.sequence === 'descent',
-    flying = s.playback !== 'observing';
+    flying = s.playback !== 'observing',
+    webgl = isWebglActive();
+  document.documentElement.classList.toggle('has-webgl', webgl);
+  document.documentElement.classList.toggle('no-webgl', !webgl);
+  document.documentElement.dataset.motion = s.reducedMotion
+    ? 'reduced'
+    : 'full';
+  document.documentElement.dataset.motionMode = s.motionMode;
   document.body.dataset.playback = s.playback;
   document.body.classList.toggle('in-flight', flying);
   document.body.classList.toggle('settling', s.flightPhase === 'settling');
   for (const element of [$('.masthead'), $('.flight-panel'), $('#rail')])
     element.inert = flying;
   $('#timed-navigation').hidden = flying;
-  $('#inspection').inert = flying || !renderer;
+  $('#inspection').inert = flying || !webgl;
+  $('#inspection').setAttribute('aria-disabled', String(flying || !webgl));
   $('#playback-controls').hidden = !flying || complete;
   $('#enter-horizon').hidden =
     flying || CHECKPOINTS[s.now].kind !== 'blackhole';
   $('#skip-flight').textContent = descent ? 'Finish descent' : 'Skip flight';
+  $('#skip-flight').setAttribute(
+    'aria-description',
+    descent
+      ? 'Finish descent into Sagittarius A*'
+      : `Skip flight to ${CHECKPOINTS[s.next].name}`,
+  );
   $('#ending').hidden = !complete;
   $('#timed-instruments').hidden = complete;
   $('#inspection').hidden = complete;
@@ -274,6 +322,15 @@ function updateTimedUI() {
   }
   $<HTMLButtonElement>('#previous').disabled = s.now === 0;
   $<HTMLButtonElement>('#next').disabled = s.now === CHECKPOINTS.length - 1;
+  for (const id of ['zoom-in', 'zoom-out', 'reset-view'])
+    $<HTMLButtonElement>(`#${id}`).disabled = !webgl;
+  if (!webgl) {
+    $('#inspection-hint').textContent =
+      '3D inspection unavailable in static illustration mode · Use Next, Previous, or Jump to';
+  } else if (!$('#inspection-hint').querySelector('.desktop-hint')) {
+    $('#inspection-hint').innerHTML =
+      '<span class="desktop-hint">Drag to explore · Scroll to travel</span><span class="mobile-hint">Drag to explore · Pinch to zoom</span>';
+  }
   $('#next').textContent =
     s.now === CHECKPOINTS.length - 1
       ? 'End of route'
@@ -284,11 +341,7 @@ function updateTimedUI() {
   const earth = earthDistance(s.earthKm);
   $('#earth-miles').textContent = earth.miles;
   $('#earth-context').textContent = earth.context;
-  digits.update(
-    mph(s.speedKmS),
-    s.playback !== 'flying',
-    matchMedia('(prefers-reduced-motion: reduce)').matches,
-  );
+  digits.update(mph(s.speedKmS), s.playback !== 'flying', s.reducedMotion);
   $('#speed-label').textContent = descent
     ? 'Horizon approach'
     : 'Virtual travel speed';
@@ -322,14 +375,43 @@ function updateUI() {
     $('#details-title').textContent = p.name;
   }
   if ($<HTMLDialogElement>('#details').open) updateDetails();
-  if (renderer?.textureFailures)
+  if (renderer?.contextLost && !renderer.fallbackPinned) {
     $('#render-status').textContent =
-      'Some imagery unavailable · illustrated surfaces remain active.';
-  else if (!renderer)
-    $('#render-status').textContent =
-      'Static illustration mode · navigation and science remain available.';
+      'Graphics context lost · Journey paused. Restore 3D view or continue with static illustration.';
+    $('#context-actions').hidden = false;
+  } else {
+    $('#context-actions').hidden = true;
+    if (!renderer || renderer.fallbackPinned)
+      $('#render-status').textContent =
+        'Static illustration mode · 3D inspection unavailable; navigation and science remain available.';
+    else if (renderer.textureFailures)
+      $('#render-status').textContent =
+        'Some imagery unavailable · illustrated surfaces remain active.';
+    else if (renderer.pendingTextures > 0)
+      $('#render-status').textContent = 'Loading planetary imagery…';
+    else $('#render-status').textContent = '';
+  }
   updateAxis();
   updateTimedUI();
+}
+function handlePlaybackTransition(
+  previousPlayback: TimedFrame['playback'],
+  nextPlayback: TimedFrame['playback'],
+) {
+  if (previousPlayback !== 'observing' && nextPlayback === 'observing') {
+    const hash = `#${CHECKPOINTS[state.now].id}`;
+    if (location.hash !== hash) history.pushState(null, '', hash);
+    updateUI();
+    $(state.now === CHECKPOINTS.length - 1 ? '#previous' : '#next').focus();
+    $('#journey-announcement').textContent =
+      `Arrived at ${CHECKPOINTS[state.now].name}.`;
+  }
+  if (previousPlayback !== 'complete' && nextPlayback === 'complete') {
+    updateUI();
+    $('#replay').focus();
+    $('#journey-announcement').textContent =
+      'Journey complete. Return to Earth to replay.';
+  }
 }
 let lastPhase = '';
 function frame() {
@@ -340,20 +422,7 @@ function frame() {
   if (controller.snapshot().playback !== 'paused') time += dt;
   const previousPlayback = state.playback;
   state = controller.tick(now);
-  if (previousPlayback !== 'observing' && state.playback === 'observing') {
-    const hash = `#${CHECKPOINTS[state.now].id}`;
-    if (location.hash !== hash) history.pushState(null, '', hash);
-    updateUI();
-    $(state.now === CHECKPOINTS.length - 1 ? '#previous' : '#next').focus();
-    $('#journey-announcement').textContent =
-      `Arrived at ${CHECKPOINTS[state.now].name}.`;
-  }
-  if (previousPlayback !== 'complete' && state.playback === 'complete') {
-    updateUI();
-    $('#replay').focus();
-    $('#journey-announcement').textContent =
-      'Journey complete. Return to Earth to replay.';
-  }
+  handlePlaybackTransition(previousPlayback, state.playback);
   renderer?.render(state, time);
   audio.update(state as TimedFrame);
   if (state.now !== selected || state.phase !== lastPhase || now - uiAt >= 70) {
@@ -372,9 +441,13 @@ document.addEventListener('visibilitychange', () => {
   wheel.reset();
   last = performance.now();
   renderer?.resetTiming();
+  state = controller.snapshot();
+  updateUI();
 });
 window.addEventListener('resize', () => {
   renderer?.resize();
+  updateUI();
+  renderer?.render(state, time);
 });
 window.addEventListener(
   'pagehide',
@@ -385,8 +458,9 @@ window.addEventListener(
   },
   { once: true },
 );
-void go(location.hash.slice(1), false, false);
+controller.observe(resolveStop(location.hash.slice(1)));
 state = controller.snapshot();
+history.replaceState(null, '', `#${CHECKPOINTS[state.now].id}`);
 updateUI();
 declare global {
   interface Window {
@@ -398,6 +472,10 @@ declare global {
       axis: () => ReturnType<typeof distanceAxis>;
       render: () => JourneyRenderer['diagnostics'] | undefined;
       audio: () => ReturnType<AudioEngine['diagnostics']>;
+      motion: () => { mode: MotionMode; reduced: boolean };
+      loseContext: () => void;
+      restoreContext: () => void;
+      setQuality: (scale: number) => void;
     };
   }
 }
@@ -409,7 +487,64 @@ window.__horizon = {
   axis: () => axisModel,
   render: () => renderer?.diagnostics,
   audio: () => audio.diagnostics(),
+  motion: () => ({
+    mode: controller.currentMotionMode,
+    reduced: controller.reducedMotion,
+  }),
+  loseContext: () => renderer?.loseContext(),
+  restoreContext: () => renderer?.restoreContext(),
+  setQuality: (scale: number) => renderer?.setQuality(scale),
 };
+
+if (renderer) {
+  renderer.onStatusChange = () => updateUI();
+  renderer.onContextLost = () => {
+    controller.pause(performance.now());
+    clearInspection();
+    wheel.reset();
+    state = controller.snapshot();
+    updateUI();
+    $('#journey-announcement').textContent =
+      'Graphics context lost. Journey paused. Restore 3D view or continue with static illustration.';
+  };
+  renderer.onContextRestored = () => {
+    state = controller.snapshot();
+    updateUI();
+    renderer.render(state, time);
+    $('#journey-announcement').textContent = '3D view restored.';
+  };
+}
+$('#restore-webgl').addEventListener('click', () => {
+  renderer?.restoreContext();
+});
+$('#continue-fallback').addEventListener('click', () => {
+  renderer?.useStaticFallback();
+  updateUI();
+  $('#journey-announcement').textContent =
+    'Continuing with static illustration.';
+});
+function applyMotionPreference(mode: MotionMode, persist: boolean) {
+  if (persist) writeMotionMode(mode);
+  controller.setMotionMode(mode, reducedQuery.matches);
+  motionSelect.value = mode;
+  state = controller.snapshot();
+  updateUI();
+  renderer?.render(state, time);
+  audio.update(state);
+}
+motionSelect.addEventListener('change', () => {
+  const mode = motionSelect.value as MotionMode;
+  applyMotionPreference(mode, true);
+  $('#journey-announcement').textContent =
+    `Motion preference set to ${mode} (${controller.reducedMotion ? 'reduced motion' : 'full motion'}).`;
+});
+reducedQuery.addEventListener('change', () => {
+  controller.setSystemReducedMotion(reducedQuery.matches);
+  state = controller.snapshot();
+  updateUI();
+  renderer?.render(state, time);
+  audio.update(state);
+});
 
 const soundToggle = $<HTMLButtonElement>('#sound-toggle');
 function updateSound() {
@@ -468,9 +603,21 @@ $('#enter-horizon').addEventListener('click', () => {
 });
 $('#next').addEventListener('click', () => launch(1));
 $('#previous').addEventListener('click', () => launch(-1));
-$('#zoom-in').addEventListener('click', () => controller.zoomBy(0.95));
-$('#zoom-out').addEventListener('click', () => controller.zoomBy(1.05));
-$('#reset-view').addEventListener('click', () => controller.resetView());
+$('#zoom-in').addEventListener('click', () => {
+  controller.zoomBy(0.95);
+  state = controller.snapshot();
+  renderer?.render(state, time);
+});
+$('#zoom-out').addEventListener('click', () => {
+  controller.zoomBy(1.05);
+  state = controller.snapshot();
+  renderer?.render(state, time);
+});
+$('#reset-view').addEventListener('click', () => {
+  controller.resetView();
+  state = controller.snapshot();
+  renderer?.render(state, time);
+});
 $('#pause-flight').addEventListener('click', () => {
   if (controller.snapshot().playback === 'paused')
     controller.resume(performance.now());
@@ -483,14 +630,23 @@ $('#pause-flight').addEventListener('click', () => {
       : 'Flight resumed.';
 });
 $('#skip-flight').addEventListener('click', () => {
+  const previousPlayback = state.playback;
   controller.skip();
   wheel.reset();
+  state = controller.snapshot();
+  handlePlaybackTransition(previousPlayback, state.playback);
+  renderer?.render(state, time);
+  audio.update(state);
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    const wasFlying = controller.snapshot().playback === 'flying';
     controller.pause(performance.now());
     state = controller.snapshot();
     updateUI();
+    if (wasFlying && state.playback === 'paused') {
+      $('#journey-announcement').textContent = 'Flight paused.';
+    }
   }
 });
 document.addEventListener(
@@ -501,6 +657,7 @@ document.addEventListener(
     );
     if (
       excluded ||
+      document.querySelector('dialog[open]') ||
       e.ctrlKey ||
       e.metaKey ||
       e.shiftKey ||

@@ -15,15 +15,47 @@ export function earthDistance(km: number) {
 export class RollingDigits {
   private columns: { el: HTMLElement; value: number }[] = [];
   private previous = 0;
+  private lastReducedAt = -Infinity;
+  private lastAriaAt = -Infinity;
+  private wasReduced = false;
   constructor(private root: HTMLElement) {}
-  update(value: number, frozen: boolean, reduced: boolean) {
+  update(
+    value: number,
+    frozen: boolean,
+    reduced: boolean,
+    now = performance.now(),
+  ) {
     const integer = Math.round(value),
       formatted = integer.toLocaleString('en-US');
+    this.root.dataset.reduced = String(reduced);
+    if (reduced || frozen) {
+      for (const col of this.columns) {
+        col.el.style.filter = '';
+        (col.el.firstElementChild as HTMLElement | null)
+          ?.getAnimations()
+          .forEach((a) => a.cancel());
+      }
+    }
+    if (
+      reduced &&
+      this.wasReduced &&
+      !frozen &&
+      integer > 0 &&
+      this.columns.length > 0 &&
+      now - this.lastReducedAt < 100
+    ) {
+      return;
+    }
+    this.wasReduced = reduced;
+    if (reduced) this.lastReducedAt = now;
     this.root.dataset.value = String(integer);
-    this.root.parentElement?.setAttribute(
-      'aria-label',
-      `${formatted} miles per hour`,
-    );
+    if (frozen || now - this.lastAriaAt >= 1000) {
+      this.lastAriaAt = now;
+      this.root.parentElement?.setAttribute(
+        'aria-label',
+        `${formatted} miles per hour`,
+      );
+    }
     if (this.columns.length !== formatted.length) {
       this.root.replaceChildren();
       this.columns = [...formatted].map((char) => {
@@ -45,7 +77,9 @@ export class RollingDigits {
         direction = Math.sign(integer - this.previous);
       const distance =
         direction >= 0 ? (digit - from + 10) % 10 : -((from - digit + 10) % 10);
-      if (distance && !frozen && !reduced) {
+      if (frozen || reduced) {
+        strip.getAnimations().forEach((a) => a.cancel());
+      } else if (distance) {
         strip.getAnimations().forEach((a) => a.cancel());
         strip.animate(
           [
