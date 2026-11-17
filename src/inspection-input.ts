@@ -7,15 +7,32 @@ export function inspectionInput(
 ) {
   const pointers = new Map<number, { x: number; y: number }>();
   let separation = 0,
-    previousTime = 0;
+    previousTime = 0,
+    downX = 0,
+    downY = 0,
+    moved = false,
+    lastTap = 0,
+    tapX = 0,
+    tapY = 0,
+    pinched = false;
   const clear = () => {
     pointers.clear();
     separation = 0;
+    lastTap = 0;
     controller.setDragging(false);
     controller.fling(0, 0);
   };
   region.addEventListener('pointerdown', (e) => {
     if (controller.snapshot().playback !== 'observing') return;
+    if (!pointers.size) {
+      downX = e.clientX;
+      downY = e.clientY;
+      moved = false;
+      pinched = false;
+    } else {
+      pinched = true;
+      lastTap = 0;
+    }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (e.isTrusted) region.setPointerCapture(e.pointerId);
     controller.setDragging(true);
@@ -25,6 +42,7 @@ export function inspectionInput(
   region.addEventListener('pointermove', (e) => {
     const previous = pointers.get(e.pointerId);
     if (!previous) return;
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) > 8) moved = true;
     const dx = (previous.x - e.clientX) * 0.006,
       dy = (e.clientY - previous.y) * 0.006;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -43,9 +61,35 @@ export function inspectionInput(
     }
   });
   region.addEventListener('pointerup', (e) => {
+    if (
+      e.pointerType === 'touch' &&
+      !moved &&
+      !pinched &&
+      pointers.size === 1
+    ) {
+      if (
+        lastTap &&
+        e.timeStamp - lastTap < 350 &&
+        Math.hypot(e.clientX - tapX, e.clientY - tapY) < 30
+      ) {
+        controller.toggleZoom();
+        onChange?.();
+        lastTap = 0;
+      } else {
+        lastTap = e.timeStamp;
+        tapX = e.clientX;
+        tapY = e.clientY;
+      }
+    } else lastTap = 0;
     pointers.delete(e.pointerId);
     separation = 0;
     if (!pointers.size) controller.setDragging(false);
+  });
+  region.addEventListener('dblclick', (e) => {
+    if (controller.snapshot().playback !== 'observing') return;
+    e.preventDefault();
+    controller.toggleZoom();
+    onChange?.();
   });
   region.addEventListener('pointercancel', clear);
   region.addEventListener('lostpointercapture', (e) => {
