@@ -28,7 +28,17 @@ import {
   travelTime,
   AU,
 } from './science';
-import { readUnitMode, writeUnitMode, formatLength, formatAcceleration, speedValue, speedUnit, observationFacts, detailFacts, type UnitMode } from './units';
+import {
+  readUnitMode,
+  writeUnitMode,
+  formatLength,
+  formatAcceleration,
+  speedValue,
+  speedUnit,
+  observationFacts,
+  detailFacts,
+  type UnitMode,
+} from './units';
 import { JourneyRenderer } from './renderer';
 import { AudioEngine } from './audio';
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
@@ -42,7 +52,9 @@ const MOTION_KEY = 'journey-through-space.motion';
 const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
 function readMotionMode(): MotionMode {
   try {
-    const saved = localStorage.getItem(MOTION_KEY) ?? localStorage.getItem('event-horizon.motion');
+    const saved =
+      localStorage.getItem(MOTION_KEY) ??
+      localStorage.getItem('event-horizon.motion');
     if (saved === 'system' || saved === 'full' || saved === 'reduced')
       return saved;
   } catch {
@@ -76,30 +88,93 @@ const axisModel = distanceAxis(0, 0);
 let unitMode: UnitMode = readUnitMode();
 const unitSelect = $<HTMLSelectElement>('#unit-mode');
 unitSelect.value = unitMode;
-unitSelect.addEventListener('change', () => {unitMode = unitSelect.value as UnitMode; writeUnitMode(unitMode); updateUI();});
-function closeSettings(focus = true) { $('#preference-controls').hidden = true; $('#settings-toggle').setAttribute('aria-expanded','false'); if(focus) $('#settings-toggle').focus(); }
-$('#settings-toggle').addEventListener('click', () => { const open = $('#preference-controls').hidden; $('#preference-controls').hidden = !open; $('#settings-toggle').setAttribute('aria-expanded',String(open)); if(open) motionSelect.focus(); });
-function closeAuHelp(focus = true) { $('#au-help').hidden = true; $('#au-help-toggle').setAttribute('aria-expanded','false'); if(focus) $('#au-help-toggle').focus(); }
-$('#au-help-toggle').addEventListener('click', () => { const open = $('#au-help').hidden; $('#au-help').hidden = !open; $('#au-help-toggle').setAttribute('aria-expanded',String(open)); });
-let previewIndex = -1;
-function closePreview(focus = false) { $('#route-preview').hidden = true; if(focus && previewIndex >= 0) ($('#route-stops').children[previewIndex] as HTMLElement).focus(); }
-function preview(i:number) { previewIndex = i; $('#route-preview-text').textContent = `${CHECKPOINTS[i].name} — ${CHECKPOINTS[i].description}`; $('#route-preview').hidden = false; }
-const touchRoute = () => matchMedia('(hover: none)').matches;
-for(const [i,p] of CHECKPOINTS.entries()) {
- const b = document.createElement('button'); b.type = 'button'; b.textContent = p.name; b.dataset.stop = p.id; b.className = 'route-stop'; b.setAttribute('aria-label', `Go to ${p.name}`);
- b.style.setProperty('--route-gap', `${i ? 8 + Math.sqrt(LEG_DURATIONS[i-1]) * 2 : 0}px`);
- b.addEventListener('pointerenter', () => {if(!touchRoute()) preview(i);});
- b.addEventListener('focus', () => {if(!touchRoute()) preview(i);});
- b.addEventListener('click', () => {if(touchRoute()) preview(i); else {closePreview(); void go(p.id);}});
- $('#route-stops').append(b);
+unitSelect.addEventListener('change', () => {
+  unitMode = unitSelect.value as UnitMode;
+  writeUnitMode(unitMode);
+  updateUI();
+});
+function closeSettings(focus = true) {
+  $('#preference-controls').hidden = true;
+  $('#settings-toggle').setAttribute('aria-expanded', 'false');
+  if (focus) $('#settings-toggle').focus();
 }
-$('#route-go').addEventListener('click', () => {if(previewIndex >= 0) void go(CHECKPOINTS[previewIndex].id);closePreview();});
-$('#rail').addEventListener('pointerleave', () => {if(!touchRoute() && !$('#rail').contains(document.activeElement)) closePreview();});
-document.addEventListener('focusin', (e) => {if(!$('#rail').contains(e.target as Node)) closePreview();});
-document.addEventListener('pointerdown', (e) => { const target = e.target as Node; if(!$('#settings').contains(target)) closeSettings(false); if(!$('#earth-distance').contains(target)) closeAuHelp(false); if(!$('#rail').contains(target)) closePreview(); });
+$('#settings-toggle').addEventListener('click', () => {
+  const open = $('#preference-controls').hidden;
+  $('#preference-controls').hidden = !open;
+  $('#settings-toggle').setAttribute('aria-expanded', String(open));
+  if (open) motionSelect.focus();
+});
+function closeAuHelp(focus = true) {
+  $('#au-help').hidden = true;
+  $('#au-help-toggle').setAttribute('aria-expanded', 'false');
+  if (focus) $('#au-help-toggle').focus();
+}
+$('#au-help-toggle').addEventListener('click', () => {
+  const open = $('#au-help').hidden;
+  $('#au-help').hidden = !open;
+  $('#au-help-toggle').setAttribute('aria-expanded', String(open));
+});
+let previewIndex = -1;
+function closePreview(focus = false) {
+  $('#route-preview').hidden = true;
+  if (focus && previewIndex >= 0)
+    ($('#route-stops').children[previewIndex] as HTMLElement).focus();
+}
+function preview(i: number) {
+  previewIndex = i;
+  $('#route-preview-text').textContent =
+    `${CHECKPOINTS[i].name} — ${CHECKPOINTS[i].description}`;
+  $('#route-preview').hidden = false;
+}
+const touchRoute = () => matchMedia('(hover: none)').matches;
+for (const [i, p] of CHECKPOINTS.entries()) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = p.name;
+  b.dataset.stop = p.id;
+  b.className = 'route-stop';
+  b.setAttribute('aria-label', `Go to ${p.name}`);
+  b.style.setProperty(
+    '--route-gap',
+    `${i ? 8 + Math.sqrt(LEG_DURATIONS[i - 1]) * 2 : 0}px`,
+  );
+  b.addEventListener('pointerenter', () => {
+    if (!touchRoute()) preview(i);
+  });
+  b.addEventListener('focus', () => {
+    if (!touchRoute()) preview(i);
+  });
+  b.addEventListener('click', () => {
+    if (touchRoute()) preview(i);
+    else {
+      closePreview();
+      void go(p.id);
+    }
+  });
+  $('#route-stops').append(b);
+}
+$('#route-go').addEventListener('click', () => {
+  if (previewIndex >= 0) void go(CHECKPOINTS[previewIndex].id);
+  closePreview();
+});
+$('#rail').addEventListener('pointerleave', () => {
+  if (!touchRoute() && !$('#rail').contains(document.activeElement))
+    closePreview();
+});
+document.addEventListener('focusin', (e) => {
+  if (!$('#rail').contains(e.target as Node)) closePreview();
+});
+document.addEventListener('pointerdown', (e) => {
+  const target = e.target as Node;
+  if (!$('#settings').contains(target)) closeSettings(false);
+  if (!$('#earth-distance').contains(target)) closeAuHelp(false);
+  if (!$('#rail').contains(target)) closePreview();
+});
 let navigationToken = 0;
 async function go(id: string, record = true, fade = true) {
+  const restoreNavigationFocus = document.activeElement === $('#route-go');
   const token = ++navigationToken;
+  closePreview();
   clearInspection();
   wheel.reset();
   controller.pause(performance.now());
@@ -118,7 +193,9 @@ async function go(id: string, record = true, fade = true) {
   if (record && location.hash !== hash) history.pushState(null, '', hash);
   else history.replaceState(null, '', hash);
   document.body.classList.remove('direct-navigation');
-  if (id === 'earth') $('#next').focus();
+  if (id === 'earth' || restoreNavigationFocus) $('#next').focus();
+  $('#journey-announcement').textContent =
+    `Arrived at ${CHECKPOINTS[state.now].name}.`;
 }
 window.addEventListener(
   'hashchange',
@@ -144,12 +221,17 @@ document.addEventListener('click', (e) => {
 for (const id of ['sources', 'details']) {
   const d = $<HTMLDialogElement>(`#${id}`);
   $(`#${id}-close`).addEventListener('click', () => d.close());
-  d.addEventListener('close', () => (id === 'sources' ? $('#settings-toggle') : $('#details-open')).focus());
+  d.addEventListener('close', () =>
+    (id === 'sources' ? $('#settings-toggle') : $('#details-open')).focus(),
+  );
 }
 function openDialog(id: string) {
   $<HTMLDialogElement>(`#${id}`).showModal();
 }
-$('#sources-open').addEventListener('click', () => { closeSettings(false); openDialog('sources'); });
+$('#sources-open').addEventListener('click', () => {
+  closeSettings(false);
+  openDialog('sources');
+});
 $('#details-open').addEventListener('click', () => {
   updateDetails();
   openDialog('details');
@@ -185,26 +267,48 @@ function updateDetails() {
       ],
     );
   $('#details-content').innerHTML =
-    `<p>${p.description}</p><dl>${metrics.map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}${detailFacts(p.id, unitMode).map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}</dl><p class="note">${p.note}</p><p class="note">Earth distance is straight-line displacement from Earth's center, rounded in the selected units in the instrument. Tour distance follows the authored route. Inspection changes neither value. Virtual speed is the route-distance derivative. Facts and approximate model values: see the linked source and source limitations.${` <a href="${OBSERVATION_FACTS[p.id].source}" target="_blank" rel="noreferrer">NASA · ${p.name} reference</a>`}</p><p class="note">Distances and visibility are rescaled in the visuals. Warp streaks illustrate compressed travel, not an actual faster-than-light spacecraft. Reference positions are approximations, not Horizons vectors. Parker comparisons hold its record speed constant without acceleration or braking.</p>${p.kind === 'blackhole' ? '<p class="note">The bright ring is illustrative. Optical framing is independent of the scientific observation radius; spin and relativistic orbital evolution are omitted. The descent and dark interior are illustrative, not a survival or geodesic simulation; the radius is not a measured local velocity.</p>' : ''}`;
+    `<p>${p.description}</p><dl>${metrics.map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}${detailFacts(
+      p.id,
+      unitMode,
+    )
+      .map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`)
+      .join(
+        '',
+      )}</dl><p class="note">${p.note}</p><p class="note">Earth distance is straight-line displacement from Earth's center, rounded in the selected units in the instrument. Tour distance follows the authored route. Inspection changes neither value. Virtual speed is the route-distance derivative. Facts and approximate model values: see the linked source and source limitations.${` <a href="${OBSERVATION_FACTS[p.id].source}" target="_blank" rel="noreferrer">NASA · ${p.name} reference</a>`}</p><p class="note">Distances and visibility are rescaled in the visuals. Warp streaks illustrate compressed travel, not an actual faster-than-light spacecraft. Reference positions are approximations, not Horizons vectors. Parker comparisons hold its record speed constant without acceleration or braking.</p>${p.kind === 'blackhole' ? '<p class="note">The bright ring is illustrative. Optical framing is independent of the scientific observation radius; spin and relativistic orbital evolution are omitted. The descent and dark interior are illustrative, not a survival or geodesic simulation; the radius is not a measured local velocity.</p>' : ''}`;
 }
 function isWebglActive() {
   return Boolean(renderer && !renderer.contextLost && !renderer.fallbackPinned);
 }
 function updateUI() {
-  const s = state, p = CHECKPOINTS[s.now], flying = s.playback !== 'observing', complete = s.playback === 'complete', descent = s.sequence === 'descent', webgl = isWebglActive();
+  const s = state,
+    p = CHECKPOINTS[s.now],
+    flying = s.playback !== 'observing',
+    complete = s.playback === 'complete',
+    descent = s.sequence === 'descent',
+    webgl = isWebglActive();
   document.body.dataset.checkpoint = p.id;
   document.body.dataset.phase = s.phase;
   document.body.dataset.playback = s.playback;
   document.body.classList.add('timed-journey');
   document.body.classList.toggle('in-flight', flying);
   document.documentElement.dataset.kind = p.kind;
-  document.documentElement.dataset.motion = s.reducedMotion ? 'reduced' : 'full';
+  document.documentElement.dataset.motion = s.reducedMotion
+    ? 'reduced'
+    : 'full';
   document.documentElement.dataset.motionMode = s.motionMode;
   document.documentElement.classList.toggle('has-webgl', webgl);
   document.documentElement.classList.toggle('no-webgl', !webgl);
   document.documentElement.style.setProperty('--accent', p.color);
   document.documentElement.style.setProperty('--fallback-color', p.color);
-  for (const el of [$('.masthead'), $('.flight-panel'), $('#rail'), $('#timed-navigation')]) { el.hidden = flying; el.inert = flying; }
+  for (const el of [
+    $('.masthead'),
+    $('.flight-panel'),
+    $('#rail'),
+    $('#timed-navigation'),
+  ]) {
+    el.hidden = flying;
+    el.inert = flying;
+  }
   $('#inspection').hidden = complete;
   $('#inspection').inert = flying || !webgl;
   $('#inspection').setAttribute('aria-disabled', String(flying || !webgl));
@@ -213,15 +317,25 @@ function updateUI() {
   const key = `${s.now}:${unitMode}`;
   if ($('#observation-facts').dataset.stop !== key) {
     $('#observation-facts').dataset.stop = key;
-    $('#observation-facts').innerHTML = observationFacts(p.id, unitMode).map(([label,value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('');
+    $('#observation-facts').innerHTML = observationFacts(p.id, unitMode)
+      .map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`)
+      .join('');
   }
   $<HTMLButtonElement>('#previous').disabled = s.now === 0;
-  $('#previous').innerHTML = `<span class="nav-direction"><svg viewBox="0 0 24 12" aria-hidden="true"><path d="M23 6H2m5-5L2 6l5 5"/></svg> Previous</span><span>${s.now ? CHECKPOINTS[s.now-1].name : 'Earth'}</span>`;
+  $('#previous').innerHTML =
+    `<span class="nav-direction"><svg viewBox="0 0 24 12" aria-hidden="true"><path d="M23 6H2m5-5L2 6l5 5"/></svg> Previous</span><span>${s.now ? CHECKPOINTS[s.now - 1].name : 'Earth'}</span>`;
   const atEnd = s.now === CHECKPOINTS.length - 1;
-  $('#previous').setAttribute('aria-label', `Previous · ${s.now ? CHECKPOINTS[s.now-1].name : 'Earth'}`);
-  $('#next').setAttribute('aria-label', atEnd ? 'Enter the event horizon' : `Next · ${CHECKPOINTS[s.now+1].name}`);
+  $('#previous').setAttribute(
+    'aria-label',
+    `Previous · ${s.now ? CHECKPOINTS[s.now - 1].name : 'Earth'}`,
+  );
+  $('#next').setAttribute(
+    'aria-label',
+    atEnd ? 'Enter the event horizon' : `Next · ${CHECKPOINTS[s.now + 1].name}`,
+  );
   $('#next').dataset.action = atEnd ? 'enter' : 'next';
-  $('#next').innerHTML = `<span class="nav-direction">${atEnd ? 'Continue' : 'Next'} <svg viewBox="0 0 24 12" aria-hidden="true"><path d="M1 6h21m-5-5 5 5-5 5"/></svg></span><span>${atEnd ? 'Enter the event horizon' : CHECKPOINTS[s.now+1].name}</span>`;
+  $('#next').innerHTML =
+    `<span class="nav-direction">${atEnd ? 'Continue' : 'Next'} <svg viewBox="0 0 24 12" aria-hidden="true"><path d="M1 6h21m-5-5 5 5-5 5"/></svg></span><span>${atEnd ? 'Enter the event horizon' : CHECKPOINTS[s.now + 1].name}</span>`;
   $('#inspection-hint').hidden = !webgl;
   $('#playback-controls').hidden = !flying || complete;
   $('#pause-flight').textContent = s.playback === 'paused' ? 'Resume' : 'Pause';
@@ -235,22 +349,50 @@ function updateUI() {
   $('#earth-context').textContent = earth.context;
   $('#au-help-toggle').hidden = !earth.context.includes('AU');
   if ($('#au-help-toggle').hidden) closeAuHelp(false);
-  $('#au-help').textContent = `An astronomical unit (AU) is approximately the average Earth–Sun distance: ${formatLength(AU, unitMode)}.`;
+  $('#au-help').textContent =
+    `An astronomical unit (AU) is approximately the average Earth–Sun distance: ${formatLength(AU, unitMode)}.`;
   $('#speed-unit').textContent = speedUnit(unitMode);
-  digits.update(speedValue(s.speedKmS, unitMode), s.playback !== 'flying', s.reducedMotion, performance.now(), unitMode === 'miles' ? 'miles per hour' : 'kilometres per hour');
-  $('#speed-needle').style.transform = `rotate(${180 * Math.max(0,Math.min(1,s.thrust))}deg)`;
-  $('#horizon-radius').textContent = s.bhRadius <= 1 ? 'Inside the horizon' : formatLength((s.bhRadius - 1) * RS, unitMode);
+  digits.update(
+    speedValue(s.speedKmS, unitMode),
+    s.playback !== 'flying',
+    s.reducedMotion,
+    performance.now(),
+    unitMode === 'miles' ? 'miles per hour' : 'kilometres per hour',
+  );
+  $('#speed-needle').style.transform =
+    `rotate(${180 * Math.max(0, Math.min(1, s.thrust))}deg)`;
+  $('#horizon-radius').textContent =
+    s.bhRadius <= 1
+      ? 'Inside the horizon'
+      : formatLength((s.bhRadius - 1) * RS, unitMode);
   $('#ending').hidden = !complete;
-  $('#final-stats').textContent = `${formatLength(TOTAL,unitMode)} through ${CHECKPOINTS.length} stops; ${PLAYBACK_SECONDS} seconds of forward route playback, plus 20 seconds of optional descent. ${duration(travelTime(TOTAL))} light-equivalent route time.`;
+  $('#final-stats').textContent =
+    `${formatLength(TOTAL, unitMode)} through ${CHECKPOINTS.length} stops; ${PLAYBACK_SECONDS} seconds of forward route playback, plus 20 seconds of optional descent. ${duration(travelTime(TOTAL))} light-equivalent route time.`;
   if (selected !== s.now) {
     selected = s.now;
-    for (const [i,el] of [...$('#route-stops').children].entries()) el.setAttribute('aria-current', i === s.now ? 'step' : 'false');
-    if (!flying) requestAnimationFrame(() => $('#route-stops').children[s.now]?.scrollIntoView({block:'nearest',inline:'center',behavior:'instant'}));
+    for (const [i, el] of [...$('#route-stops').children].entries())
+      el.setAttribute('aria-current', i === s.now ? 'step' : 'false');
+    if (!flying)
+      requestAnimationFrame(() =>
+        $('#route-stops').children[s.now]?.scrollIntoView({
+          block: 'nearest',
+          inline: 'center',
+          behavior: 'instant',
+        }),
+      );
   }
   if ($<HTMLDialogElement>('#details').open) updateDetails();
   const lost = renderer?.contextLost && !renderer.fallbackPinned;
   $('#context-actions').hidden = !lost;
-  $('#render-status').textContent = lost ? 'Graphics context lost · Journey paused. Restore 3D view or continue with static illustration.' : !renderer || renderer.fallbackPinned ? 'Static illustration · 3D inspection unavailable.' : renderer.textureFailures ? 'Some imagery unavailable · illustrated surfaces remain active.' : renderer.pendingTextures ? 'Loading planetary imagery…' : '';
+  $('#render-status').textContent = lost
+    ? 'Graphics context lost · Journey paused. Restore 3D view or continue with static illustration.'
+    : !renderer || renderer.fallbackPinned
+      ? 'Static illustration · 3D inspection unavailable.'
+      : renderer.textureFailures
+        ? 'Some imagery unavailable · illustrated surfaces remain active.'
+        : renderer.pendingTextures
+          ? 'Loading planetary imagery…'
+          : '';
 }
 function handlePlaybackTransition(
   previousPlayback: TimedFrame['playback'],
@@ -459,8 +601,6 @@ function enterHorizon() {
   }
 }
 $('#next').addEventListener('click', () =>
-  $('#previous').setAttribute('aria-label', `Previous · ${s.now ? CHECKPOINTS[s.now-1].name : 'Earth'}`);
-  $('#next').setAttribute('aria-label', atEnd ? 'Enter the event horizon' : `Next · ${CHECKPOINTS[s.now+1].name}`);
   $('#next').dataset.action === 'enter' ? enterHorizon() : launch(1),
 );
 $('#previous').addEventListener('click', () => launch(-1));
@@ -486,9 +626,18 @@ $('#skip-flight').addEventListener('click', () => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (!$('#preference-controls').hidden) { closeSettings(); return; }
-    if (!$('#au-help').hidden) { closeAuHelp(); return; }
-    if (!$('#route-preview').hidden) { closePreview(true); return; }
+    if (!$('#preference-controls').hidden) {
+      closeSettings();
+      return;
+    }
+    if (!$('#au-help').hidden) {
+      closeAuHelp();
+      return;
+    }
+    if (!$('#route-preview').hidden) {
+      closePreview(true);
+      return;
+    }
     if (document.querySelector('dialog[open]')) return;
     const wasFlying = controller.snapshot().playback === 'flying';
     controller.pause(performance.now());
@@ -529,4 +678,3 @@ document.addEventListener(
   },
   { passive: false, capture: true },
 );
-

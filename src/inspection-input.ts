@@ -12,6 +12,7 @@ export function inspectionInput(
     downY = 0,
     moved = false,
     lastTap = 0,
+    lastTouchToggle = -Infinity,
     tapX = 0,
     tapY = 0,
     pinched = false;
@@ -72,6 +73,7 @@ export function inspectionInput(
         e.timeStamp - lastTap < 350 &&
         Math.hypot(e.clientX - tapX, e.clientY - tapY) < 30
       ) {
+        lastTouchToggle = e.timeStamp;
         controller.toggleZoom();
         onChange?.();
         lastTap = 0;
@@ -86,7 +88,11 @@ export function inspectionInput(
     if (!pointers.size) controller.setDragging(false);
   });
   region.addEventListener('dblclick', (e) => {
-    if (controller.snapshot().playback !== 'observing') return;
+    if (
+      controller.snapshot().playback !== 'observing' ||
+      e.timeStamp - lastTouchToggle < 500
+    )
+      return;
     e.preventDefault();
     controller.toggleZoom();
     onChange?.();
