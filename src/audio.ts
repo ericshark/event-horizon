@@ -51,11 +51,24 @@ const LEVEL = { master: 0.55, bed: 0.1, drive: 0.16, arrival: 0.07 };
 /** Smoothing time constant (s); every change goes through it, so there are no steps. */
 const TAU = 0.22;
 export type SoundStatus = 'off' | 'on' | 'blocked';
-const KEY = 'event-horizon.sound';
+const KEY = 'journey-through-space.sound';
+const LEGACY_KEY = 'event-horizon.sound';
 
 function readPreference() {
   try {
-    return localStorage.getItem(KEY) === 'on';
+    const saved = localStorage.getItem(KEY);
+    if (saved === 'on' || saved === 'off') return saved === 'on';
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy === 'on' || legacy === 'off') {
+      // Failed persistence must not discard an explicit preference we already read.
+      try {
+        localStorage.setItem(KEY, legacy);
+      } catch {
+        /* read-only storage */
+      }
+      return legacy === 'on';
+    }
+    return false;
   } catch {
     return false;
   }
