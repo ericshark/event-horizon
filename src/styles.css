@@ -90,9 +90,29 @@ summary:focus-visible {
 }
 .vignette {
   z-index: 1;
+  /* Eased multi-stop falloffs: a plain two-stop ramp leaves a visible edge
+     across bright worlds. */
   background:
-    linear-gradient(90deg, #020609cc, transparent 45%),
-    linear-gradient(0deg, #020609ed, transparent 35%);
+    linear-gradient(
+      90deg,
+      #020609cc 0%,
+      #020609a3 12%,
+      #0206096b 24%,
+      #02060938 35%,
+      #02060914 45%,
+      #02060905 52%,
+      transparent 58%
+    ),
+    linear-gradient(
+      0deg,
+      #020609ed 0%,
+      #020609c2 10%,
+      #02060982 19%,
+      #02060945 27%,
+      #0206091a 35%,
+      #02060906 42%,
+      transparent 48%
+    );
 }
 .masthead {
   position: fixed;
@@ -632,7 +652,11 @@ dialog a {
       0deg,
       #020609 0%,
       #020609f0 30%,
-      transparent 67%
+      #020609b8 40%,
+      #02060970 49%,
+      #02060933 57%,
+      #0206090f 64%,
+      transparent 70%
     );
   }
   .flight-panel {

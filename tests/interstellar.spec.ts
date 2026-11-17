@@ -16,6 +16,7 @@ import {
   streakStrength,
   VOYAGER_AU,
 } from '../src/scenery';
+import { BASE_FOV, FOV_EXPANSION } from '../src/warp';
 import { buildVoyager, voyagerExtent } from '../src/voyager';
 import {
   chooseStop,
@@ -66,13 +67,19 @@ test('long-leg effects build and decay smoothly with no steps in thrust, FOV or 
         fov: fovExpansion(leg, f.warp, f.thrust),
       };
       expect(Math.abs(now.thrust - previous.thrust)).toBeLessThan(0.09);
-      expect(Math.abs(now.streak - previous.streak)).toBeLessThan(0.012);
-      expect(Math.abs(now.fov - previous.fov)).toBeLessThan(0.3);
-      expect(now.fov).toBeLessThanOrEqual(3.5 + 1e-9);
+      // Full-strength hyperdrive, still eased: no step larger than 5% of the
+      // envelope (or 0.7° of FOV) in a tenth of a second.
+      expect(Math.abs(now.streak - previous.streak)).toBeLessThan(0.05);
+      expect(Math.abs(now.fov - previous.fov)).toBeLessThan(0.7);
+      expect(now.fov).toBeLessThanOrEqual(FOV_EXPANSION + 1e-9);
       previous = now;
     }
     expect(previous.thrust).toBeLessThan(0.02);
+    expect(previous.streak).toBeLessThan(0.05);
     expect(Math.max(...frames.map((f) => f.thrust))).toBeCloseTo(1, 2);
+    expect(
+      Math.max(...frames.map((f) => streakStrength(leg, f.warp, f.thrust))),
+    ).toBeCloseTo(1, 2);
   }
   expect(schedule(0, 50).thrust).toBe(0);
   expect(streakStrength(11, 0, 0)).toBe(0);
@@ -386,7 +393,8 @@ test('Voyager→Proxima→Sagittarius A* real-time flights keep evolving scenery
     }));
     expect(sample.speed!.length).toBeGreaterThan(0);
     expect(sample.earth!.length).toBeGreaterThan(0);
-    if (info.project.name === 'desktop') expect(sample.fov).toBeLessThan(44);
+    if (info.project.name === 'desktop')
+      expect(sample.fov).toBeLessThanOrEqual(BASE_FOV + FOV_EXPANSION + 1e-9);
     else expect(sample.fov).toBe(100);
     thrust.push(sample.thrust);
     weights.push(sample.scenery);

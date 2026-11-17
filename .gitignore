@@ -7,3 +7,6 @@ playwright-report/
 
 # Reproducible local verification captures for the interface redesign.
 /artifacts/journey-through-space/
+
+# Raw source downloads for scripts/build-textures.mjs (reproducible, not shipped).
+/assets-src/

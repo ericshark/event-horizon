@@ -1,35 +1,5 @@
 [
   {
-    "file": "earth.jpg",
-    "credit": "NASA imagery distributed with the Three.js examples",
-    "source": "https://github.com/mrdoob/three.js/blob/dev/examples/textures/planets/earth_day_4096.jpg"
-  },
-  {
-    "file": "clouds.png",
-    "credit": "NASA imagery distributed with Three.js examples",
-    "source": "https://github.com/mrdoob/three.js/tree/dev/examples/textures/planets"
-  },
-  {
-    "file": "night.png",
-    "credit": "NASA imagery distributed with Three.js examples",
-    "source": "https://github.com/mrdoob/three.js/tree/dev/examples/textures/planets"
-  },
-  {
-    "file": "stars.jpg",
-    "credit": "NASA 3D Resources / Hipparcos catalogue star map",
-    "source": "https://github.com/nasa/NASA-3D-Resources/tree/master/Images%20and%20Textures/Hipparcos%20Star%20Map"
-  },
-  {
-    "file": "earth-normal.jpg",
-    "credit": "NASA imagery distributed with the Three.js examples",
-    "source": "https://github.com/mrdoob/three.js/blob/dev/examples/textures/planets/earth_normal_2048.jpg"
-  },
-  {
-    "file": "earth-specular.jpg",
-    "credit": "NASA imagery distributed with the Three.js examples",
-    "source": "https://github.com/mrdoob/three.js/blob/dev/examples/textures/planets/earth_specular_2048.jpg"
-  },
-  {
     "file": "moon.jpg",
     "credit": "Solar System Scope textures, based on NASA imagery",
     "source": "https://www.solarsystemscope.com/textures/moon",
@@ -93,13 +63,6 @@
     "modifications": "Used unmodified (2048x1024)."
   },
   {
-    "file": "saturn-rings.png",
-    "credit": "Solar System Scope textures, based on NASA imagery",
-    "source": "https://www.solarsystemscope.com/textures/saturn-rings",
-    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
-    "modifications": "Used unmodified; radial strip mapped to ring radius 1.2\u20132.3 body radii."
-  },
-  {
     "file": "voyager-model (procedural, no image file)",
     "credit": "Original geometry authored for this project from NASA/JPL Voyager spacecraft descriptions (3.7 m high-gain dish, RTG, science and magnetometer booms, plasma-wave antennas)",
     "source": "https://science.nasa.gov/mission/voyager/spacecraft/",
@@ -119,5 +82,117 @@
     "source": "https://developer.mozilla.org/docs/Web/API/Web_Audio_API",
     "license": "Original work",
     "modifications": "None; gains follow the flight snapshot."
+  },
+  {
+    "file": "earth.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/earth",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Downscaled from the 8192x4096 day map to 4096x2048 base by scripts/build-textures.mjs."
+  },
+  {
+    "file": "earth-8k.webp",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/earth",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "8192x4096 day map re-encoded as WebP; streamed only while Earth is observed on the high quality tier."
+  },
+  {
+    "file": "night.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/earth",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Downscaled from the 8192x4096 night-lights map to 4096x2048."
+  },
+  {
+    "file": "clouds.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/earth",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Downscaled from the 8192x4096 cloud map to 4096x2048 greyscale; uploaded as one channel."
+  },
+  {
+    "file": "clouds-8k.webp",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/earth",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "8192x4096 greyscale cloud map re-encoded as WebP; hero upgrade only."
+  },
+  {
+    "file": "earth-normal.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/earth",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Downscaled from the 8192x4096 normal map to 4096x2048."
+  },
+  {
+    "file": "earth-specular.jpg",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/earth",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "Downscaled from the 8192x4096 specular (ocean) map to 4096x2048 greyscale."
+  },
+  {
+    "file": "moon-8k.webp",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/moon",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "8192x4096 colour map re-encoded as WebP; hero upgrade only."
+  },
+  {
+    "file": "mars-8k.webp",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/mars",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "8192x4096 colour map re-encoded as WebP; hero upgrade only."
+  },
+  {
+    "file": "mercury-8k.webp",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/mercury",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "8192x4096 colour map re-encoded as WebP; hero upgrade only. No usable Mercury elevation model was available, so relief is still derived from brightness."
+  },
+  {
+    "file": "saturn-rings.png",
+    "credit": "Solar System Scope textures, based on NASA imagery",
+    "source": "https://www.solarsystemscope.com/textures/saturn",
+    "license": "CC BY 4.0 (Solar System Scope, derived from NASA / USGS / JPL data)",
+    "modifications": "8192x500 ring alpha strip resampled to a 4096x4 radial profile, mapped to ring radius 1.2–2.3 body radii."
+  },
+  {
+    "file": "moon-normal.jpg",
+    "credit": "NASA Scientific Visualization Studio CGI Moon Kit, LRO LOLA elevation (LDEM, 16 px/degree)",
+    "source": "https://svs.gsfc.nasa.gov/4720/",
+    "license": "Public domain (NASA)",
+    "modifications": "Converted from elevation to a 4096x2048 tangent-space normal map by scripts/build-textures.mjs; slopes normalised and exaggerated for legibility; longitude alignment checked against the colour map."
+  },
+  {
+    "file": "mars-normal.jpg",
+    "credit": "NASA Mars Global Surveyor MOLA Mission Experiment Gridded Data Record (MEGDR, 16 px/degree), NASA PDS Geosciences Node",
+    "source": "https://pds-geosciences.wustl.edu/missions/mgs/megdr.html",
+    "license": "Public domain (NASA)",
+    "modifications": "Converted from elevation to a 4096x2048 tangent-space normal map; longitude rotated 180° to match the colour map; slopes normalised and exaggerated for legibility."
+  },
+  {
+    "file": "milkyway.jpg",
+    "credit": "NASA Scientific Visualization Studio, Deep Star Maps 2020 (Milky Way, galactic coordinates)",
+    "source": "https://svs.gsfc.nasa.gov/4851/",
+    "license": "Public domain (NASA)",
+    "modifications": "Linear EXR radiance scaled so its 99.95th percentile is white, encoded as sRGB 4096x2048 JPEG. Diffuse Milky Way only; individual stars are drawn separately and are illustrative."
+  },
+  {
+    "file": "milkyway-8k.webp",
+    "credit": "NASA Scientific Visualization Studio, Deep Star Maps 2020 (Milky Way, galactic coordinates)",
+    "source": "https://svs.gsfc.nasa.gov/4851/",
+    "license": "Public domain (NASA)",
+    "modifications": "Same encoding as milkyway.jpg at 8192x4096 WebP; hero upgrade on the high quality tier only."
+  },
+  {
+    "file": "starfield (procedural, no image file)",
+    "credit": "Original star distribution authored for this project; concentration towards the galactic plane and core follows the general structure of the Milky Way",
+    "source": "https://svs.gsfc.nasa.gov/4851/",
+    "license": "Original work",
+    "modifications": "Positions, magnitudes and colour temperatures are illustrative, not a star catalogue. Relativistic aberration and Doppler tint during flight are artistic."
   }
 ]

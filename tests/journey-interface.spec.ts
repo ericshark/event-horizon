@@ -87,6 +87,12 @@ test('inspection double activation toggles close-up and leaves Earth distance un
   await page.waitForFunction(() =>
     Boolean(window.__horizon?.state().cameraPose),
   );
+  // Gesture timing is measured after start-up texture uploads, which can stall
+  // input delivery on the software renderer used for verification.
+  await expect(page.locator('html')).toHaveAttribute('data-textures', 'ready');
+  await expect
+    .poll(() => page.evaluate(() => window.__horizon!.render()?.pending))
+    .toBe(0);
   const original = await page.evaluate(() => window.__horizon!.state());
   const surface = page.locator('#inspection');
   if (isMobile) {

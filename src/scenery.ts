@@ -5,6 +5,7 @@
  * and are never moved for spectacle.
  */
 import { AU, clamp, smooth } from './science';
+import { warpAt } from './warp';
 
 export type Rgb = [number, number, number];
 export interface Scenery {
@@ -59,30 +60,25 @@ export function sceneryAt(earthKm: number, position: number): Scenery {
   };
 }
 /**
- * Streak strength. Earlier legs keep the original rate-derived value; the long
- * interstellar legs follow the thrust envelope so streaks build and decay with the
- * same eased speed as everything else instead of staying nearly invisible.
+ * Streak strength: the hyperdrive envelope from `warp.ts`. Every leg reaches the
+ * same full strength, following the shared thrust envelope so streaks build and
+ * decay with the same eased speed as everything else. `leg` and `warp` are kept
+ * in the signature for existing callers.
  */
 export function streakStrength(
-  leg: number,
-  warp: number,
+  _leg: number,
+  _warp: number,
   thrust: number,
   reducedMotion = false,
 ) {
-  if (reducedMotion) return 0;
-  if (leg < FIRST_INTERSTELLAR_STOP)
-    return warp * Math.min(1, 0.25 + 0.18 * leg);
-  return thrust * [0.1, 0.13, 0.16][Math.min(2, leg - FIRST_INTERSTELLAR_STOP)];
+  return warpAt(thrust, reducedMotion).stretch;
 }
-/** Restrained field-of-view expansion in degrees. */
+/** Field-of-view expansion in degrees, zero at rest and in reduced motion. */
 export function fovExpansion(
-  leg: number,
-  warp: number,
+  _leg: number,
+  _warp: number,
   thrust: number,
   reducedMotion = false,
 ) {
-  if (reducedMotion) return 0;
-  return leg < FIRST_INTERSTELLAR_STOP
-    ? warp * 8
-    : thrust * [2.5, 3, 3.5][Math.min(2, leg - FIRST_INTERSTELLAR_STOP)];
+  return warpAt(thrust, reducedMotion).fov;
 }

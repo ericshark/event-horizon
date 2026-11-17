@@ -18,6 +18,10 @@ export interface FlightState extends JourneyState {
   warp: number;
   direction: number;
   approach: number;
+  /** Unit direction of travel in render space (camera forward at rest). */
+  heading?: import('./science').Vec;
+  /** Camera bank in radians, for diagnostics. */
+  bank?: number;
 }
 export interface AxisGroup {
   indices: number[];

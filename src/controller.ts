@@ -149,6 +149,17 @@ function facing(position: Vec, target: Vec) {
     ),
   );
 }
+/** Unit forward (−Z) direction of a camera pose. */
+function forwardOf(p: CameraPose): Vec {
+  return new Vector3(0, 0, -1)
+    .applyQuaternion(new Quaternion(...p.rotation))
+    .toArray() as Vec;
+}
+/** Bank (radians per unit of lateral arc) and cruise float (render units). */
+const BANK = 0.011;
+const FLOAT = 0.06;
+/** Half-width, in visual progress, of the chord that defines the heading. */
+const HEADING_WINDOW = 0.07;
 function pose(position: Vec, target: Vec): CameraPose {
   return { position, rotation: facing(position, target).toArray() };
 }
@@ -352,6 +363,8 @@ export class JourneyController {
       fraction = progress - segment,
       scientificPosition = pointAtDistance(segment, fraction);
     let cameraPose = this.camera;
+    let heading = forwardOf(this.camera);
+    let bank = 0;
     if (!observing) {
       const startFacing = new Quaternion(...this.start.rotation);
       const travelFacing = facing(this.start.position, this.end.position);
@@ -394,25 +407,43 @@ export class JourneyController {
       };
       // Escape radially, round the safe viewing sphere, then cross between
       // its forward tangent points. Arbitrary inspection never cuts a world.
-      const p =
-        u < 0.15
-          ? mix(this.start.position, a, u / 0.15)
-          : u < 0.3
-            ? orbit(a, outbound, startCenter, (u - 0.15) / 0.15)
-            : u <= 0.7
-              ? mix(outbound, inbound, (u - 0.3) / 0.4)
-              : u <= 0.85
-                ? orbit(inbound, b, endCenter, (u - 0.7) / 0.15)
-                : mix(b, this.end.position, (u - 0.85) / 0.15);
-      if (u >= 0.3 && u <= 0.7) {
-        const swell =
-          Math.sin((Math.PI * (u - 0.3)) / 0.4) ** 2 *
-          (this.reducedMotion ? 0.35 : 1);
-        const arc = ARCS[leg % ARCS.length];
-        p[1] += arc[0] * swell;
-        p[0] += arc[1] * swell;
+      const arc = ARCS[leg % ARCS.length],
+        calm = this.reducedMotion ? 0.35 : 1;
+      const pathAt = (v: number): Vec => {
+        const q =
+          v < 0.15
+            ? mix(this.start.position, a, v / 0.15)
+            : v < 0.3
+              ? orbit(a, outbound, startCenter, (v - 0.15) / 0.15)
+              : v <= 0.7
+                ? mix(outbound, inbound, (v - 0.3) / 0.4)
+                : v <= 0.85
+                  ? orbit(inbound, b, endCenter, (v - 0.7) / 0.15)
+                  : mix(b, this.end.position, (v - 0.85) / 0.15);
+        if (v >= 0.3 && v <= 0.7) {
+          const swell = Math.sin((Math.PI * (v - 0.3)) / 0.4) ** 2 * calm;
+          q[1] += arc[0] * swell;
+          q[0] += arc[1] * swell;
+        }
+        return q;
+      };
+      const p = pathAt(u);
+      // The path joins its segments with corners; a chord across a window of the
+      // path keeps the heading (and so the aberrated sky) continuous through them.
+      const ahead = pathAt(Math.min(1, u + HEADING_WINDOW)),
+        behind = pathAt(Math.max(0, u - HEADING_WINDOW));
+      const tangent = new Vector3(...ahead).sub(new Vector3(...behind));
+      if (tangent.lengthSq() > 1e-12)
+        heading = tangent.normalize().toArray() as Vec;
+      // Gentle bank into each lateral arc and a slight float while cruising.
+      // Both are zero at the ends of the crossing and absent in reduced motion.
+      let roll = 0;
+      if (u > 0.3 && u < 0.7 && !this.reducedMotion) {
+        const window = Math.sin((Math.PI * (u - 0.3)) / 0.4) ** 2;
+        roll = -arc[1] * Math.sin((2 * Math.PI * (u - 0.3)) / 0.4) * BANK;
+        p[1] += FLOAT * window * Math.sin(this.elapsed * 1.1);
       }
-      const rotation =
+      let rotation =
         timing.phase === 'departure'
           ? startFacing.slerp(
               travelFacing,
@@ -424,6 +455,11 @@ export class JourneyController {
                 (this.elapsed - timing.departure) / (LEG_DURATIONS[leg] * 0.4),
               ),
             );
+      if (roll)
+        rotation = rotation.multiply(
+          new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), roll),
+        );
+      bank = roll;
       cameraPose = { position: p, rotation: rotation.toArray() };
     }
     const speedKmS = observing ? 0 : LEG_LENGTHS[leg] * timing.rate;
@@ -466,12 +502,15 @@ export class JourneyController {
           ? 'turn'
           : 'transit',
       direction: Math.sign(this.target - this.stop),
+      heading,
+      bank,
       warp: observing || this.reducedMotion ? 0 : 0.075 * timing.rate * 3,
       dragging: this.drag,
       motionMode: this.motionMode,
       reducedMotion: this.reducedMotion,
     };
     Object.freeze(scientificPosition);
+    Object.freeze(heading);
     Object.freeze(cameraPose.position);
     Object.freeze(cameraPose.rotation);
     Object.freeze(cameraPose);
@@ -536,6 +575,8 @@ export class JourneyController {
       thrust: 0,
       warp: 0,
       speedKmS: 0,
+      heading: forwardOf(cameraPose),
+      bank: 0,
       next: this.stop,
     });
   }

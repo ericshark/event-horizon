@@ -1,26 +1,11 @@
 /** GPU layers for the incidental interstellar scenery described by `scenery.ts`. */
-import {
-  AdditiveBlending,
-  BufferGeometry,
-  Float32BufferAttribute,
-  Group,
-  Points,
-  ShaderMaterial,
-  Vector3,
-} from 'three';
+import { Group, Quaternion, Vector2, Vector3 } from 'three';
 import type { Scenery } from './scenery';
+import { StreakField, type StreakSpec } from './starfield';
 
-interface LayerSpec {
+interface LayerSpec extends StreakSpec {
   key: keyof Pick<Scenery, 'kuiper' | 'heliopause' | 'oort' | 'interstellar'>;
-  count: number;
-  spread: [number, number];
-  depth: number;
-  size: number;
-  /** World units of drift per unit of journey position. */
-  drift: number;
   opacity: number;
-  colors: string[];
-  seed: number;
 }
 /** Sparse by design: no layer is dense enough to read as an obstacle field. */
 const SPECS: LayerSpec[] = [
@@ -34,6 +19,7 @@ const SPECS: LayerSpec[] = [
     opacity: 0.5,
     colors: ['#b9c6d6', '#9fb4c8', '#d4dbe3'],
     seed: 11,
+    streak: 10,
   },
   {
     key: 'heliopause',
@@ -42,9 +28,10 @@ const SPECS: LayerSpec[] = [
     depth: 190,
     size: 5.2,
     drift: 70,
-    opacity: 0.075,
+    opacity: 0.06,
     colors: ['#7f9bff', '#a98bff', '#6fc3ff'],
     seed: 23,
+    streak: 6,
   },
   {
     key: 'oort',
@@ -56,6 +43,7 @@ const SPECS: LayerSpec[] = [
     opacity: 0.55,
     colors: ['#dfe7f1', '#c8d3e6', '#f3e8d6'],
     seed: 37,
+    streak: 12,
   },
   {
     key: 'interstellar',
@@ -67,107 +55,84 @@ const SPECS: LayerSpec[] = [
     opacity: 0.95,
     colors: ['#ffffff', '#cfe0ff', '#ffe2b8', '#ffb98a', '#ff9a7a'],
     seed: 53,
+    streak: 18,
   },
 ];
-const VERT = `attribute vec3 aColor;uniform float uTravel,uDrift,uDepth,uSize,uScale;varying vec3 vC;varying float vA;
-void main(){float z=mod(position.z-uTravel*uDrift,uDepth)+2.;vec4 mv=modelViewMatrix*vec4(position.xy,z,1.);
-vC=aColor;vA=smoothstep(2.,22.,z)*(1.-smoothstep(uDepth*.7,uDepth,z));
-gl_PointSize=clamp(uSize*uScale/max(1.,-mv.z),1.,16.);gl_Position=projectionMatrix*mv;}`;
-const FRAG = `varying vec3 vC;varying float vA;uniform float uOpacity;
-void main(){float d=length(gl_PointCoord-.5);float a=smoothstep(.5,.05,d);gl_FragColor=vec4(vC,a*vA*uOpacity);}`;
+/** Fine dust that streams past on every flight; its weight is the warp envelope. */
+const FLOW: StreakSpec = {
+  count: 650,
+  spread: [42, 30],
+  depth: 260,
+  size: 0.03,
+  maxWidth: 2.2,
+  drift: 520,
+  colors: ['#dfe9ff', '#ffffff', '#ffe9cc', '#c9dcff'],
+  seed: 97,
+  streak: 22,
+};
+const FLOW_OPACITY = 0.38;
+
+export interface LayerFrame {
+  at: Vector3;
+  /** Orientation whose local +Z is the camera's forward direction. */
+  facing: Quaternion;
+  scenery: Scenery;
+  /** Monotonic odometer of route position travelled. */
+  travel: number;
+  /** Focal length in device pixels. */
+  focal: number;
+  stretch: number;
+  viewport: Vector2;
+  reduced?: boolean;
+}
 
 export class SceneryLayers {
   readonly group = new Group();
-  private layers: {
-    spec: LayerSpec;
-    points: Points;
-    material: ShaderMaterial;
-  }[] = [];
+  private layers: { spec: LayerSpec; field: StreakField }[] = [];
+  private flow = new StreakField(FLOW);
   constructor() {
     for (const spec of SPECS) {
-      let seed = spec.seed * 7919;
-      const random = () => {
-        seed = (seed * 16807) % 2147483647;
-        return seed / 2147483647;
-      };
-      const position: number[] = [],
-        color: number[] = [];
-      for (let i = 0; i < spec.count; i++) {
-        position.push(
-          (random() - 0.5) * spec.spread[0] * 2,
-          (random() - 0.5) * spec.spread[1] * 2,
-          random() * spec.depth,
-        );
-        const hex = spec.colors[Math.floor(random() * spec.colors.length)],
-          c = {
-            r: parseInt(hex.slice(1, 3), 16) / 255,
-            g: parseInt(hex.slice(3, 5), 16) / 255,
-            b: parseInt(hex.slice(5, 7), 16) / 255,
-          };
-        const shade = 0.55 + 0.45 * random();
-        color.push(c.r * shade, c.g * shade, c.b * shade);
-      }
-      const geometry = new BufferGeometry();
-      geometry.setAttribute(
-        'position',
-        new Float32BufferAttribute(position, 3),
-      );
-      geometry.setAttribute('aColor', new Float32BufferAttribute(color, 3));
-      const material = new ShaderMaterial({
-        transparent: true,
-        depthWrite: false,
-        blending: AdditiveBlending,
-        uniforms: {
-          uTravel: { value: 0 },
-          uDrift: { value: spec.drift },
-          uDepth: { value: spec.depth },
-          uSize: { value: spec.size },
-          uScale: { value: 400 },
-          uOpacity: { value: 0 },
-        },
-        vertexShader: VERT,
-        fragmentShader: FRAG,
-      });
-      const points = new Points(geometry, material);
-      points.frustumCulled = false;
-      points.visible = false;
-      points.renderOrder = 9;
-      this.group.add(points);
-      this.layers.push({ spec, points, material });
+      const field = new StreakField(spec);
+      field.mesh.visible = false;
+      this.group.add(field.mesh);
+      this.layers.push({ spec, field });
     }
+    this.flow.mesh.visible = false;
+    this.group.add(this.flow.mesh);
   }
-  /** `travel` is the journey position; `scale` converts world size to pixels. */
-  update(
-    at: Vector3,
-    scenery: Scenery,
-    travel: number,
-    scale: number,
-    reduced = false,
-  ) {
-    this.group.position.copy(at);
+  update(f: LayerFrame) {
+    this.group.position.copy(f.at);
+    this.group.quaternion.copy(f.facing);
     // Interstellar stars thicken towards the galactic centre.
-    const stars = scenery.interstellar * (0.45 + 0.55 * scenery.galactic);
-    for (const { spec, points, material } of this.layers) {
-      const weight = spec.key === 'interstellar' ? stars : scenery[spec.key];
-      points.visible = weight > 0.002;
-      material.uniforms.uOpacity.value = weight * spec.opacity;
-      material.uniforms.uTravel.value = reduced ? 0 : travel;
-      material.uniforms.uScale.value = scale;
-    }
+    const stars = f.scenery.interstellar * (0.45 + 0.55 * f.scenery.galactic);
+    const set = (field: StreakField, weight: number, opacity: number) => {
+      const u = field.material.uniforms;
+      field.mesh.visible = weight > 0.002;
+      u.uOpacity.value = weight * opacity;
+      u.uTravel.value = f.reduced ? 0 : f.travel;
+      u.uFocal.value = f.focal;
+      u.uStretch.value = f.reduced ? 0 : f.stretch;
+      u.uViewport.value.copy(f.viewport);
+    };
+    for (const { spec, field } of this.layers)
+      set(
+        field,
+        spec.key === 'interstellar' ? stars : f.scenery[spec.key],
+        spec.opacity,
+      );
+    set(this.flow, f.reduced ? 0 : f.stretch, FLOW_OPACITY);
   }
   /** Current layer weights, for diagnostics and tests. */
   get weights() {
     return Object.fromEntries(
-      this.layers.map(({ spec, material }) => [
+      this.layers.map(({ spec, field }) => [
         spec.key,
-        material.uniforms.uOpacity.value / spec.opacity,
+        field.material.uniforms.uOpacity.value / spec.opacity,
       ]),
     );
   }
   dispose() {
-    for (const { points, material } of this.layers) {
-      points.geometry.dispose();
-      material.dispose();
-    }
+    for (const { field } of this.layers) field.dispose();
+    this.flow.dispose();
   }
 }

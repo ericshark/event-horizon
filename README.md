@@ -75,6 +75,11 @@ navigation-grade ephemeris or physically achievable spacecraft flight.
 - `flight.ts`: shared frame contract and legacy linear-distance utilities.
 - `units.ts` / `instruments.ts`: display conversions, curated fact presentation, and speed digits.
 - `renderer.ts`: one Three.js context, local scene origins, assets and camera application.
+- `worlds.ts`: per-world look (tilt, flattening, authored light, surface model, atmosphere).
+- `planet-materials.ts`: HDR body, atmosphere, ring, corona and glint shaders.
+- `warp.ts`: pure hyperdrive envelope, aberration/Doppler maths and exposure adaptation.
+- `starfield.ts`: Milky Way panorama, star quads and near-field streaks.
+- `post.ts`: quality tiers and the HDR chain (bloom, lens, tone mapping).
 - `main.ts`: semantic UI, navigation/history, input and snapshot-driven instruments.
 
 The complete route uses the timed controller; scroll position no longer owns
@@ -99,6 +104,65 @@ space is deliberately compressed; scientific progress and speed retain their
 integral relationship. See [the revised duration table and numerical evidence](docs/verification/journey-through-space-flight.md).
 
 ## Rendering and verification
+
+### Image pipeline and quality tiers
+
+On the **high** tier (desktop with float render targets) the scene renders into
+a 4× multisampled half-float buffer, bloom picks up only very bright light
+(stars, glints, city lights, the accretion disc), and one output pass applies
+the hyperdrive's lens bend and radial streak blur in linear light before Khronos
+Neutral tone mapping, sRGB and dither. **Medium** (phones, or after adaptive
+downscaling) halves bloom and MSAA. **Low** (scale below 0.5, no float buffers,
+or a software rasteriser such as the test browser) renders directly with tone
+mapping in each material. The existing adaptive loop moves between tiers.
+`?quality=high|medium|low` pins a tier and full resolution for captures.
+
+### Worlds
+
+Each body's look lives in `worlds.ts`, with its own light direction so phases
+vary along the tour. Atmospheres are integrated per pixel with single scattering
+(Earth's blue limb and warm terminator; Venus, Mars and the giants' haze).
+Rocky worlds use a Lommel–Seeliger/Lambert blend; the Moon and Mars carry
+normal maps derived from LOLA and MOLA elevation, and Mercury, without usable
+elevation data, derives relief from brightness. Giants are flattened to their
+real oblateness and their bands drift slowly. Saturn's rings are lit or
+back-lit by side and receive the globe's shadow. The Sun and Proxima are HDR
+emitters with a streamer corona. Distant bodies show as points of light that
+resolve into discs; there is no cross-fade. Exposure adapts to glare, so the
+Milky Way fades beside a bright world and returns in empty space.
+
+On the high tier, 8K maps for Earth (day and clouds), the Moon, Mars, Mercury
+and the Milky Way stream in at rest for the observed world only and are released
+on departure; 4K base maps always load first, so loading and fallback behaviour
+are unchanged. Jupiter, Saturn, the Sun, Venus, Uranus and Neptune have no
+higher-resolution source and stay at 4K/2K. Every shipped texture is rebuilt
+from raw downloads with:
+
+```sh
+node --max-old-space-size=8192 scripts/build-textures.mjs
+```
+
+Raw files go in the git-ignored `assets-src/raw/`; the script lists each source.
+
+### Hyperdrive
+
+`warp.ts` maps the flight's `thrust` logarithmically to a 0–1 envelope, the
+same on every leg, so the effect builds as the departure world falls away and
+drops out before arrival. At speed the sky is relativistically aberrated
+towards the heading (β up to 0.62), Doppler-tinted, and each star stretches
+along its own apparent motion; fine dust streams past, the frame edges bend
+slightly and the field of view opens by up to 14° on desktop. The camera banks
+gently through each arc. Everything derives from the flight snapshot; Reduced
+motion removes all of it. Captures of every stop and of fixed-fraction flight
+strips in Full and Reduced:
+
+```sh
+PREVIEW_URL=http://127.0.0.1:5174 node scripts/capture-visuals.mjs
+```
+
+See [visual realism verification](docs/verification/visual-realism.md).
+
+### Integrated features
 
 Planetary encounters (EH-03), Voyager/Proxima and interstellar scenery with
 optional audio (EH-04), the Sagittarius A* finale (EH-05) and motion modes,
