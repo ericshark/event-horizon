@@ -1,8 +1,10 @@
 import { AU, LY } from './science';
+import { formatLength, type UnitMode } from './units';
 export const mph = (kmS: number) => (kmS * 3600) / 1.609344;
-export function earthDistance(km: number) {
+export function earthDistance(km: number, mode: UnitMode = 'miles') {
   return {
-    miles: `${Math.round(km / 1.609344).toLocaleString('en-US')} mi`,
+    miles: formatLength(km, 'miles'),
+    distance: formatLength(km, mode),
     context:
       km >= 0.1 * LY
         ? `${(km / LY).toFixed(2)} ly`
@@ -18,13 +20,16 @@ export class RollingDigits {
   private lastReducedAt = -Infinity;
   private lastAriaAt = -Infinity;
   private wasReduced = false;
+  private unitLabel = '';
   constructor(private root: HTMLElement) {}
   update(
     value: number,
     frozen: boolean,
     reduced: boolean,
     now = performance.now(),
+    unitLabel = 'miles per hour',
   ) {
+    const unitChanged = unitLabel !== this.unitLabel;
     const integer = Math.round(value),
       formatted = integer.toLocaleString('en-US');
     this.root.dataset.reduced = String(reduced);
@@ -38,6 +43,7 @@ export class RollingDigits {
     }
     if (
       reduced &&
+      !unitChanged &&
       this.wasReduced &&
       !frozen &&
       integer > 0 &&
@@ -49,11 +55,12 @@ export class RollingDigits {
     this.wasReduced = reduced;
     if (reduced) this.lastReducedAt = now;
     this.root.dataset.value = String(integer);
-    if (frozen || now - this.lastAriaAt >= 1000) {
+    if (unitChanged || frozen || now - this.lastAriaAt >= 1000) {
+      this.unitLabel = unitLabel;
       this.lastAriaAt = now;
       this.root.parentElement?.setAttribute(
         'aria-label',
-        `${formatted} miles per hour`,
+        `${formatted} ${unitLabel}`,
       );
     }
     if (this.columns.length !== formatted.length) {
