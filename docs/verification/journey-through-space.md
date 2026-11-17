@@ -47,8 +47,16 @@ are deliberately rescaled from that schedule.
   26.03, 26.03, and 25.99. Sparse Jupiter–Saturn space at nine seconds had contrast
   1.91 and visible stars. No rendering change was made to brighten that valid scene
   just to satisfy an old threshold.
-- Remaining bounded mobile, real-time, final build/format, and code-review results
-  are appended when completed; this record does not yet claim those passed.
+- The bounded mobile regression suite passed all **72** cases, including all-stop
+  traversal, both directions, inspection/gestures, motion settings, unit facts,
+  sound lifecycle, keyboard focus, texture timeout, no-WebGL and context recovery.
+- The isolated real-time suite passed all **10** desktop/mobile cases: Earth–Moon
+  round trip with pause/resume, outer-planet travel, the complete interstellar legs,
+  final handoff and descent, and the short desktop viewport.
+- Standards review against `79a3b64...512dfd3` found no actionable findings. The
+  separate specification review found one P2: the route did not recenter its current
+  marker when viewport size changed without changing destination. That correction
+  is tracked in ticket 05 and its verification is appended below.
 
 ## Captures and limits
 
@@ -57,6 +65,14 @@ and are ignored by Git to avoid committing large reproducible media. The capture
 script records forward Earth departure, inspected reverse Moon departure, outer
 planets, the final interstellar leg, and the descent, with quarter-second scientific,
 camera and displayed-instrument samples. It closes its own browser.
+
+The real-time capture completed without browser errors: Earth forward 16 seconds,
+inspected Moon reverse 16 seconds, Jupiter forward 28 seconds, Proxima forward 60
+seconds, and descent 20 seconds. Quarter-second snapshots and milestone frames
+were reviewed for visible departure, later peak speed, braking, arrival, and the
+inside-horizon readout. Wall durations were approximately 16.7, 16.9, 28.2, 60.2,
+and 20.2 seconds respectively, including screenshot/action overhead. This does not
+replace a full subjective motion review on real hardware.
 
 Verification uses headless Chromium with SwiftShader. This establishes functional
 behavior and software-rendered visual evidence; real-device GPU frame pacing,

@@ -45,6 +45,7 @@ async function record(label, button, seconds) {
     }, 250);
   });
   await page.locator(button).click();
+  await page.waitForFunction(() => document.body.dataset.playback === 'flying');
   const started = Date.now();
   for (const [i, fraction] of [0.05, 0.15, 0.4, 0.6, 0.85, 0.98].entries()) {
     await page.waitForTimeout(
@@ -79,7 +80,8 @@ try {
     await page.waitForFunction(
       (id) =>
         document.body.dataset.checkpoint === id &&
-        document.body.dataset.playback === 'observing',
+        document.body.dataset.playback === 'observing' &&
+        !document.body.classList.contains('direct-navigation'),
       id,
     );
     await page.waitForFunction(() => window.__horizon.render()?.pending === 0);
