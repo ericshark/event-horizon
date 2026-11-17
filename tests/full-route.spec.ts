@@ -11,7 +11,7 @@ import {
 } from '../src/journey';
 import { norm, sub } from '../src/science';
 
-test('exact catalog, sourced content, legacy redirects and 236-second authored schedule', () => {
+test('exact catalog, sourced content, legacy redirects and progressively longer authored schedule', () => {
   expect(CHECKPOINTS.map((p) => p.id)).toEqual([
     'earth',
     'moon',
@@ -27,8 +27,10 @@ test('exact catalog, sourced content, legacy redirects and 236-second authored s
     'proxima',
     'sagittarius-a',
   ]);
-  expect(LEG_DURATIONS).toEqual([6, 8, 10, 12, 14, 16, 18, 20, 22, 26, 34, 50]);
-  expect(PLAYBACK_SECONDS).toBe(236);
+  expect(LEG_DURATIONS).toEqual([
+    16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 44, 60,
+  ]);
+  expect(PLAYBACK_SECONDS).toBe(356);
   for (const p of CHECKPOINTS) {
     expect(OBSERVATION_FACTS[p.id].facts).toHaveLength(3);
     expect(OBSERVATION_FACTS[p.id].source).toMatch(/^https:\/\//);
@@ -57,7 +59,9 @@ test('every connection in both directions: partition independence, analytic inte
       prev = pointAtDistance(leg, 0);
     for (let i = 1; i <= 2000; i++) {
       integral +=
-        (schedule(((i - 0.5) * duration) / 2000, duration).rate * duration) /
+        (schedule(((i - 0.5) * duration) / 2000, duration, LEG_LENGTHS[leg])
+          .rate *
+          duration) /
         2000;
       const p = pointAtDistance(leg, i / 2000);
       sampledLength += norm(sub(p, prev));

@@ -411,7 +411,7 @@ export const OBSERVATION_FACTS: Record<
 };
 
 /** Authored seconds per adjacent connection; physical lengths remain independent. */
-export const LEG_DURATIONS = [6, 8, 10, 12, 14, 16, 18, 20, 22, 26, 34, 50];
+export const LEG_DURATIONS = [16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 44, 60];
 export const PLAYBACK_SECONDS = LEG_DURATIONS.reduce(
   (sum, seconds) => sum + seconds,
   0,

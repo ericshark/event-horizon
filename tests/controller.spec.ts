@@ -1,34 +1,49 @@
 import { test, expect } from '@playwright/test';
 import { JourneyController, schedule, WheelIntent } from '../src/controller';
-import { LEG_LENGTHS, pointAtDistance } from '../src/journey';
+import { LEG_DURATIONS, LEG_LENGTHS, pointAtDistance } from '../src/journey';
 import { norm, sub, C, AU, LY } from '../src/science';
 import { mph, earthDistance } from '../src/instruments';
 
-test('six active seconds, frame partition independence and analytic speed integration', () => {
+test('departure begins immediately and readable speed builds before established travel', () => {
+  for (const leg of [0, 7, 11]) {
+    const c = new JourneyController();
+    c.observe(leg);
+    const initial = c.snapshot().cameraPose.position;
+    c.launch(0);
+    const first = c.tick(100);
+    expect(first.speedKmS).toBeGreaterThan(0);
+    expect(norm(sub(first.cameraPose.position, initial))).toBeGreaterThan(
+      0.0001,
+    );
+    const one = c.tick(1000);
+    expect(mph(one.speedKmS)).toBeLessThan(100);
+    const two = c.tick(2000);
+    expect(two.speedKmS).toBeGreaterThan(one.speedKmS);
+    const peak = c.tick(LEG_DURATIONS[leg] * 0.4 * 1000);
+    expect(peak.thrust).toBeCloseTo(1);
+    expect(norm(sub(peak.cameraPose.position, initial))).toBeGreaterThan(12);
+  }
+});
+test('authored active duration, frame partition independence and analytic speed integration', () => {
+  const duration = LEG_DURATIONS[0];
   for (const direction of [1, -1]) {
-    for (const dt of [1 / 60, 0.07, 0.4, 6]) {
+    for (const dt of [1 / 60, 0.07, 0.4, duration]) {
       const c = new JourneyController();
       c.observe(direction === 1 ? 0 : 1);
       c.launch(0, direction);
-      for (let t = dt; t < 6 - 1e-8; t += dt) c.tick(t * 1000);
-      const s = c.tick(6000);
+      for (let t = dt; t < duration - 1e-8; t += dt) c.tick(t * 1000);
+      const s = c.tick(duration * 1000);
       expect(s.playback).toBe('observing');
       expect(s.now).toBe(direction === 1 ? 1 : 0);
       expect(s.speedKmS).toBe(0);
     }
   }
   let distance = 0;
-  for (let t = 0.0005; t < 6; t += 0.001)
-    distance += schedule(t).rate * LEG_LENGTHS[0] * 0.001;
+  for (let t = 0.0005; t < duration; t += 0.001)
+    distance += schedule(t, duration).rate * LEG_LENGTHS[0] * 0.001;
   expect(Math.abs(distance / LEG_LENGTHS[0] - 1)).toBeLessThan(0.001);
-  expect(schedule(0).rate).toBe(0);
-  expect(schedule(0.899).progress).toBe(0);
-  expect(schedule(5.281).rate).toBe(0);
-  for (const t of [0.9, 0.9 + 4.38 * 0.3, 0.9 + 4.38 * 0.55, 5.28]) {
-    expect(
-      Math.abs(schedule(t - 1e-7).rate - schedule(t + 1e-7).rate),
-    ).toBeLessThan(1e-6);
-  }
+  expect(schedule(0, duration).rate).toBe(0);
+  expect(schedule(duration, duration).rate).toBe(0);
 });
 test('inspection leaves scientific quantities unchanged; pause, duplicate input, resume and skip', () => {
   const c = new JourneyController(),
@@ -98,7 +113,7 @@ test('camera is continuous and clears globes after arbitrary inspection and in r
           minimum = Infinity,
           maximumStep = 0,
           finite = true;
-        for (let t = 0; t <= 6000; t += 10) {
+        for (let t = 0; t <= LEG_DURATIONS[0] * 1000; t += 10) {
           const s = c.tick(t),
             p = s.cameraPose.position;
           for (const z of [0, 120])
@@ -123,4 +138,58 @@ test('wheel threshold, timeout, reversal and post-arrival momentum silence gate'
   expect(w.feed(30, 8300, true)).toBe(0);
   expect(w.feed(30, 8600, true)).toBe(0);
   expect(w.feed(30, 8620, true)).toBe(1);
+});
+
+test('zoom toggles close inspection without changing angle or scientific position', () => {
+  const c = new JourneyController();
+  c.observe(7);
+  c.inspect(1.7, 0.9);
+  const normal = c.snapshot();
+  c.toggleZoom();
+  const close = c.snapshot();
+  close.cameraPose.rotation.forEach((value, i) =>
+    expect(value).toBeCloseTo(normal.cameraPose.rotation[i], 12),
+  );
+  expect(close.earthKm).toBe(normal.earthKm);
+  expect(close.routeKm).toBe(normal.routeKm);
+  const range = (p: number[]) => Math.hypot(p[0], p[1], p[2] - 7 * 120);
+  expect(
+    range(close.cameraPose.position) / range(normal.cameraPose.position),
+  ).toBeCloseTo(0.8);
+  c.toggleZoom();
+  expect(c.snapshot().cameraPose).toEqual(normal.cameraPose);
+  c.launch(0);
+  const launched = c.snapshot();
+  c.toggleZoom();
+  expect(c.snapshot()).toEqual(launched);
+});
+
+test('full motion starts independently of OS preference until explicitly selected', () => {
+  const c = new JourneyController();
+  c.setSystemReducedMotion(true);
+  expect(c.currentMotionMode).toBe('full');
+  expect(c.reducedMotion).toBe(false);
+  c.setMotionMode('system');
+  expect(c.reducedMotion).toBe(true);
+});
+
+test('scientific displacement derivative agrees with speed through acceleration, cruise and braking', () => {
+  for (const leg of [0, 7, 11]) {
+    const duration = LEG_DURATIONS[leg],
+      length = LEG_LENGTHS[leg];
+    for (const fraction of [0.02, 0.15, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85]) {
+      const t = duration * fraction,
+        h = duration * 1e-6;
+      const center = schedule(t, duration, length);
+      const derivative =
+        (schedule(t + h, duration, length).progress -
+          schedule(t - h, duration, length).progress) /
+        (2 * h);
+      expect(Math.abs(derivative - center.rate)).toBeLessThan(
+        Math.max(1e-10, center.rate * 0.0001),
+      );
+      expect(center.thrust).toBeGreaterThanOrEqual(0);
+      expect(center.thrust).toBeLessThanOrEqual(1.00000001);
+    }
+  }
 });

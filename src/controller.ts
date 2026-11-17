@@ -46,37 +46,61 @@ const quintic = (x: number) => {
   const t = clamp(x);
   return clamp(t ** 3 * (10 - 15 * t + 6 * t * t));
 };
-const integral = (x: number) => {
-  const t = clamp(x);
-  return 2.5 * t ** 4 - 3 * t ** 5 + t ** 6;
-};
-/** Integral and analytic derivative of the normalized 30/25/45 speed envelope. */
-export function schedule(elapsed: number, duration = 6) {
-  const departure = Math.min(2, 0.15 * duration),
-    settle = Math.min(1.2, 0.12 * duration);
-  const moving = duration - departure - settle,
-    t = clamp((elapsed - departure) / moving);
-  const area = 0.3 / 2 + 0.25 + 0.45 / 2;
+/**
+ * A shared active-time sample: a smooth exponential acceleration, cruise, and
+ * symmetric braking. Its analytic integral is scientific progress; the derivative
+ * is the actual virtual speed. Length-aware curvature keeps the first seconds
+ * readable even on galactic legs rather than scaling an early mph spike up.
+ */
+export function schedule(
+  elapsed: number,
+  duration = LEG_DURATIONS[0],
+  lengthKm = LEG_LENGTHS[0],
+) {
+  const t = clamp(elapsed / duration),
+    ramp = 0.4,
+    cruise = 0.2,
+    k = Math.max(8, Math.log((lengthKm * 3600) / (1.609344 * duration)));
+  // v(x) = x² [k+3 - (k+2)x] exp(k(x-1)); v and v' join
+  // the plateau at 1 and 0, respectively, and start at rest with v'=0.
+  const velocity = (x: number) =>
+    x * x * (k + 3 - (k + 2) * x) * Math.exp(k * (x - 1));
+  const a = k + 3,
+    b = k + 2;
+  const primitive = (x: number) =>
+    (-b / k) * x ** 3 +
+    (a / k + (3 * b) / k ** 2) * x ** 2 +
+    ((-2 * a) / k ** 2 - (6 * b) / k ** 3) * x +
+    (2 * a) / k ** 3 +
+    (6 * b) / k ** 4;
+  const integral = (x: number) =>
+    Math.max(
+      0,
+      Math.exp(k * (x - 1)) * primitive(x) - Math.exp(-k) * primitive(0),
+    );
+  const rampArea = integral(1),
+    area = 2 * ramp * rampArea + cruise;
   let p: number, v: number;
-  if (t < 0.3) {
-    p = 0.3 * integral(t / 0.3);
-    v = quintic(t / 0.3);
-  } else if (t < 0.55) {
-    p = 0.15 + t - 0.3;
+  if (t < ramp) {
+    p = ramp * integral(t / ramp);
+    v = velocity(t / ramp);
+  } else if (t <= ramp + cruise) {
+    p = ramp * rampArea + t - ramp;
     v = 1;
   } else {
-    const u = (t - 0.55) / 0.45;
-    p = 0.4 + 0.45 * (u - integral(u));
-    v = 1 - quintic(u);
+    const x = (1 - t) / ramp;
+    p = area - ramp * integral(x);
+    v = velocity(x);
   }
-  const moving_ = elapsed > departure && elapsed < duration - settle;
+  const settle = Math.min(1.2, 0.12 * duration),
+    departure = 0.15 * duration;
   return {
-    thrust: moving_ ? v : 0,
-    progress: clamp(p / area),
-    rate:
-      elapsed <= departure || elapsed >= duration - settle
-        ? 0
-        : v / (area * moving),
+    thrust: t === 0 || t === 1 ? 0 : v,
+    progress: t === 0 ? 0 : t === 1 ? 1 : clamp(p / area),
+    rate: t === 0 || t === 1 ? 0 : v / (area * duration),
+    // Camera distance is perceptually rescaled. Expand the tiny early science
+    // fractions on this same clock; never ease the escape a second time.
+    visualProgress: t * t * (3 - 2 * t),
     departure,
     settle,
     phase:
@@ -84,9 +108,9 @@ export function schedule(elapsed: number, duration = 6) {
         ? 'departure'
         : elapsed >= duration - settle
           ? 'settling'
-          : t < 0.3
+          : t < ramp
             ? 'acceleration'
-            : t < 0.55
+            : t <= ramp + cruise
               ? 'cruise'
               : 'braking',
   } as const;
@@ -157,7 +181,7 @@ export class JourneyController {
   private zoom = 1;
   private drag = false;
   private velocity = [0, 0];
-  private motionMode: MotionMode = 'system';
+  private motionMode: MotionMode = 'full';
   private systemReduced = false;
   private camera = canonical(0);
   private start = this.camera;
@@ -227,6 +251,12 @@ export class JourneyController {
       this.zoom = Math.max(0.8, Math.min(1.2, this.zoom * factor));
       this.updateInspection();
     }
+  }
+  toggleZoom() {
+    if (this.playback !== 'observing') return;
+    this.zoom = this.zoom < 0.9 ? 1 : 0.8;
+    this.velocity = [0, 0];
+    this.updateInspection();
   }
   launch(now: number, direction = 1) {
     if (this.playback !== 'observing') return false;
@@ -310,7 +340,11 @@ export class JourneyController {
   private routeSnapshot(forceObservation = false): TimedFrame {
     const observing = forceObservation || this.playback === 'observing',
       leg = Math.min(this.stop, this.target),
-      timing = schedule(this.elapsed, LEG_DURATIONS[leg] ?? 6);
+      timing = schedule(
+        this.elapsed,
+        LEG_DURATIONS[leg] ?? LEG_DURATIONS[0],
+        LEG_LENGTHS[leg],
+      );
     const progress = observing
       ? this.stop
       : this.stop + (this.target - this.stop) * timing.progress;
@@ -330,18 +364,51 @@ export class JourneyController {
       };
       const a = escape(this.start.position, startCenter),
         b = escape(this.end.position, endCenter),
-        u = timing.progress;
+        u = timing.visualProgress;
+      const direction = Math.sign(this.target - this.stop);
+      const outbound: Vec = [0, 0, startCenter[2] + direction * 20];
+      const inbound: Vec = [0, 0, endCenter[2] - direction * 20];
+      const orbit = (
+        from: Vec,
+        to: Vec,
+        center: Vec,
+        fraction: number,
+      ): Vec => {
+        const origin = new Vector3(...from)
+          .sub(new Vector3(...center))
+          .normalize();
+        const target = new Vector3(...to)
+          .sub(new Vector3(...center))
+          .normalize();
+        const rotation = new Quaternion().setFromUnitVectors(origin, target);
+        const turn = new Quaternion().slerp(rotation, fraction);
+        const range =
+          new Vector3(...from).distanceTo(new Vector3(...center)) *
+            (1 - fraction) +
+          new Vector3(...to).distanceTo(new Vector3(...center)) * fraction;
+        return origin
+          .applyQuaternion(turn)
+          .multiplyScalar(range)
+          .add(new Vector3(...center))
+          .toArray() as Vec;
+      };
+      // Escape radially, round the safe viewing sphere, then cross between
+      // its forward tangent points. Arbitrary inspection never cuts a world.
       const p =
         u < 0.15
-          ? mix(this.start.position, a, quintic(u / 0.15))
-          : u > 0.85
-            ? mix(b, this.end.position, quintic((u - 0.85) / 0.15))
-            : mix(a, b, quintic((u - 0.15) / 0.7));
-      if (u >= 0.15 && u <= 0.85) {
+          ? mix(this.start.position, a, u / 0.15)
+          : u < 0.3
+            ? orbit(a, outbound, startCenter, (u - 0.15) / 0.15)
+            : u <= 0.7
+              ? mix(outbound, inbound, (u - 0.3) / 0.4)
+              : u <= 0.85
+                ? orbit(inbound, b, endCenter, (u - 0.7) / 0.15)
+                : mix(b, this.end.position, (u - 0.85) / 0.15);
+      if (u >= 0.3 && u <= 0.7) {
         const swell =
-            Math.sin((Math.PI * (u - 0.15)) / 0.7) ** 2 *
-            (this.reducedMotion ? 0.35 : 1),
-          arc = ARCS[leg % ARCS.length];
+          Math.sin((Math.PI * (u - 0.3)) / 0.4) ** 2 *
+          (this.reducedMotion ? 0.35 : 1);
+        const arc = ARCS[leg % ARCS.length];
         p[1] += arc[0] * swell;
         p[0] += arc[1] * swell;
       }
@@ -353,7 +420,9 @@ export class JourneyController {
             )
           : travelFacing.slerp(
               facing(p, endCenter),
-              quintic(timing.progress / 0.4),
+              quintic(
+                (this.elapsed - timing.departure) / (LEG_DURATIONS[leg] * 0.4),
+              ),
             );
       cameraPose = { position: p, rotation: rotation.toArray() };
     }
