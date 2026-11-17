@@ -8,7 +8,7 @@
       name="description"
       content="An interactive 13-stop journey from Earth to Sagittarius A*, the black hole at the centre of the Milky Way. Explore worlds, distances, and the limits of our knowledge."
     />
-    <title>Event Horizon — From Earth to the Unknown</title>
+    <title>Journey Through Space</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='%23020609' stroke='%2374cfff' stroke-width='2'/%3E%3C/svg%3E"
@@ -21,72 +21,88 @@
     </div>
     <div class="vignette" aria-hidden="true"></div>
     <header class="masthead">
-      <a href="#earth" class="brand"
-        ><span class="brand-orbit" aria-hidden="true"></span>EVENT HORIZON
-        <small>A JOURNEY THROUGH DISTANCE</small></a
-      >
-      <nav aria-label="Journey controls">
-        <label
-          >Jump to
-          <select
-            id="checkpoints"
-            aria-label="Choose a checkpoint"
-          ></select></label
-        ><button id="sources-open" type="button">Sources</button>
-      </nav>
+      <a href="#earth" class="brand">Journey Through Space</a>
     </header>
-    <main id="journey" aria-label="Explore the 13-stop journey"></main>
-    <aside
-      class="flight-panel"
-      aria-label="Current location and flight information"
-    >
-      <p id="phase" class="eyebrow">NOW / EARTH ORBIT</p>
-      <h1 id="location">Earth</h1>
-      <div class="next-line">
-        <span id="next-label">NEXT / MOON</span
-        ><span id="checkpoint-count">01 / 13</span>
-      </div>
-      <p id="description"></p>
-      <dl id="observation-facts" hidden></dl>
-      <div class="readouts" aria-label="Primary journey metrics">
-        <div>
-          <span id="range-label">ALTITUDE ABOVE EARTH</span
-          ><strong id="range-value">20,000 km</strong>
-        </div>
-        <div>
-          <span>TOUR DISTANCE TRAVELLED</span
-          ><strong id="route-value">0 km</strong>
-        </div>
-        <div>
-          <span>LIGHT-EQUIVALENT TIME</span
-          ><strong id="time-value">0 seconds</strong>
-        </div>
-      </div>
-      <div class="panel-actions">
-        <a id="begin" href="#moon"
-          >Begin the journey <span aria-hidden="true">↗</span></a
-        ><button id="details-open" type="button">
-          Details <span aria-hidden="true">＋</span>
+    <div id="settings">
+      <button
+        id="settings-toggle"
+        type="button"
+        aria-label="Settings"
+        aria-expanded="false"
+        aria-controls="preference-controls"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3Z"
+          />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+      <div id="preference-controls" hidden aria-label="Journey settings">
+        <label for="motion-mode"
+          >Motion<select id="motion-mode" aria-label="Motion preference">
+            <option value="full">Full</option>
+            <option value="reduced">Reduced</option>
+            <option value="system">System</option>
+          </select></label
+        >
+        <button id="sound-toggle" type="button" aria-pressed="false">
+          <span id="sound-label">Sound off</span>
         </button>
+        <label for="unit-mode"
+          >Distance units<select id="unit-mode" aria-label="Distance units">
+            <option value="miles">Miles</option>
+            <option value="kilometres">Kilometres</option>
+          </select></label
+        >
+        <button id="sources-open" type="button">Sources</button>
       </div>
-      <p id="cinematic-note" hidden>
-        Illustrative ring · Observation at 1,000 horizon radii.
-      </p>
+    </div>
+    <main id="journey" aria-label="Explore the 13-stop journey"></main>
+    <aside class="flight-panel" aria-label="Current location">
+      <h1 id="location">Earth</h1>
+      <p id="description"></p>
+      <dl id="observation-facts"></dl>
+      <button id="details-open" type="button">Details</button>
     </aside>
-    <section id="timed-instruments" aria-label="Travel instruments" hidden>
-      <div>
-        <span id="speed-label">Virtual travel speed</span
+    <section id="timed-instruments" aria-label="Travel instruments">
+      <div id="speedometer" hidden>
+        <svg
+          viewBox="0 0 180 100"
+          role="img"
+          aria-label="Speed relative to this flight’s peak"
+        >
+          <path d="M15 85 A75 75 0 0 1 165 85" />
+          <path id="speed-needle" d="M90 85 L24 85" />
+          <circle cx="90" cy="85" r="3" /></svg
+        ><span id="speed-label">Virtual travel speed</span
         ><strong id="speed-readout"
           ><span id="speed-digits" aria-hidden="true"></span>
-          <small>mph</small></strong
-        ><small id="light-speed"></small
-        ><strong id="horizon-radius" hidden></strong>
+          <small id="speed-unit">mph</small></strong
+        ><small>Relative to this flight’s peak</small>
       </div>
-      <div>
-        <span>Earth distance</span><strong id="earth-miles"></strong
-        ><small id="earth-context"></small>
+      <div id="descent-instrument" hidden>
+        <span>Distance above the horizon</span
+        ><strong id="horizon-radius"></strong>
       </div>
-      <span id="playback-label"></span>
+      <div id="earth-distance">
+        <span>Current distance from Earth</span
+        ><strong id="earth-miles"></strong>
+        <div class="context-line">
+          <small id="earth-context"></small
+          ><button
+            id="au-help-toggle"
+            type="button"
+            aria-label="What is an astronomical unit?"
+            aria-expanded="false"
+            aria-controls="au-help"
+            hidden
+          >
+            ?
+          </button>
+        </div>
+        <p id="au-help" hidden></p>
+      </div>
     </section>
     <div
       id="inspection"
@@ -94,53 +110,21 @@
       tabindex="0"
       aria-label="Inspect world"
       aria-describedby="inspection-hint"
-      hidden
     ></div>
-    <div id="timed-navigation" hidden>
-      <button id="previous" type="button">Previous</button
-      ><button id="next" type="button">Next</button>
-      <button id="zoom-in" type="button" aria-label="Zoom in">+</button
-      ><button id="zoom-out" type="button" aria-label="Zoom out">−</button
-      ><button id="reset-view" type="button">Reset view</button
-      ><button
-        id="journey-detail"
-        type="button"
-        aria-expanded="false"
-        aria-controls="rail"
-      >
-        Journey detail
-      </button>
+    <div id="timed-navigation">
+      <button id="previous" type="button"></button
+      ><button id="next" type="button"></button>
       <p id="inspection-hint">
-        <span class="desktop-hint">Drag to explore · Scroll to travel</span
-        ><span class="mobile-hint">Drag to explore · Pinch to zoom</span>
+        <span class="desktop-hint"
+          >Drag to explore · Double-click to zoom · Scroll to travel</span
+        ><span class="mobile-hint"
+          >Drag to explore · Pinch or double-tap to zoom</span
+        >
       </p>
     </div>
     <div id="playback-controls" hidden>
       <button id="pause-flight" type="button">Pause</button
       ><button id="skip-flight" type="button">Skip flight</button>
-    </div>
-    <div
-      id="preference-controls"
-      role="group"
-      aria-label="Motion and sound preferences"
-    >
-      <label class="motion-control" for="motion-mode"
-        ><span class="motion-label">Motion</span
-        ><select id="motion-mode" aria-label="Motion preference">
-          <option value="system">System</option>
-          <option value="full">Full</option>
-          <option value="reduced">Reduced</option>
-        </select></label
-      ><button
-        id="sound-toggle"
-        type="button"
-        aria-pressed="false"
-        data-state="off"
-        hidden
-      >
-        <span class="sound-icon" aria-hidden="true"></span
-        ><span id="sound-label">Sound off</span>
-      </button>
     </div>
     <p
       id="journey-announcement"
@@ -148,9 +132,6 @@
       role="status"
       aria-live="polite"
     ></p>
-    <div id="destination-marker" aria-hidden="true">
-      <i></i><span id="destination-name"></span>
-    </div>
     <section id="ending" hidden aria-label="Journey summary">
       <h2>Journey complete.</h2>
       <p id="final-stats"></p>
@@ -163,24 +144,16 @@
       </p>
       <a id="replay" href="#earth">Return to Earth</a>
     </section>
-    <nav
-      id="rail"
-      class="distance-rail"
-      aria-label="Distance-scaled journey timeline"
-    >
-      <div class="rail-heading">
-        <span>TOUR DISTANCE</span><span id="axis-domain"></span>
+    <nav id="rail" aria-label="Journey route">
+      <div id="route-preview" hidden>
+        <p id="route-preview-text"></p>
+        <button id="route-go" type="button">Go</button>
       </div>
-      <div id="axis-track">
-        <div id="axis-travel"></div>
-        <div id="axis-head"></div>
-        <div id="axis-markers"></div>
-      </div>
-      <div id="axis-ticks"></div>
+      <div id="route-scroll"><div id="route-stops"></div></div>
+      <p class="route-note">Itinerary &amp; pacing · not to scale</p>
     </nav>
     <dialog id="details" aria-labelledby="details-title">
       <div class="dialog-top">
-        <p class="eyebrow">FIELD NOTES</p>
         <button id="details-close" type="button" aria-label="Close details">
           Close ×
         </button>
@@ -188,24 +161,8 @@
       <h2 id="details-title">Earth</h2>
       <div id="details-content"></div>
     </dialog>
-    <dialog id="cluster" aria-labelledby="cluster-title">
-      <div class="dialog-top">
-        <p class="eyebrow">DISTANCES IN CONTEXT</p>
-        <button
-          id="cluster-close"
-          type="button"
-          aria-label="Close checkpoint group"
-        >
-          Close ×
-        </button>
-      </div>
-      <h2 id="cluster-title">Nearby checkpoints</h2>
-      <div id="cluster-inset" aria-label="Local linear distance scale"></div>
-      <ol id="cluster-list"></ol>
-    </dialog>
     <dialog id="sources" aria-labelledby="sources-title">
       <div class="dialog-top">
-        <p class="eyebrow">THE SCIENCE BEHIND THE JOURNEY</p>
         <button id="sources-close" type="button" aria-label="Close sources">
           Close ×
         </button>
@@ -214,8 +171,7 @@
       <p>
         This is a guided illustration, not a mission trajectory. Object sizes,
         spacing, rotation and transit time are rescaled for readability. Motion
-        defaults to the system preference and can be set to System, Full, or
-        Reduced at any time.
+        starts at Full and can be set to System, Full, or Reduced at any time.
       </p>
       <details open>
         <summary>Reference snapshot · 29 October 2026</summary>
