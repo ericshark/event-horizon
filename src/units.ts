@@ -25,6 +25,20 @@ export function formatAcceleration(kmS2: number, mode: UnitMode) {
 import { CHECKPOINTS, OBSERVATION_FACTS } from './journey';
 import { AU, LY, RS } from './science';
 
+/** Compact fact copy; instruments and Details retain ordinary full values. */
+function factLength(km: number, mode: UnitMode) {
+  const value = lengthValue(km, mode);
+  for (const [threshold, name] of [
+    [1e15, 'quadrillion'],
+    [1e12, 'trillion'],
+    [1e9, 'billion'],
+  ] as const) {
+    if (value >= threshold)
+      return `${number(value / threshold, 2)} ${name} ${mode === 'miles' ? 'mi' : 'km'}`;
+  }
+  return formatLength(km, mode);
+}
+
 /** Numeric overrides never infer quantities from rounded catalog prose. */
 export function observationFacts(
   id: string,
@@ -48,14 +62,14 @@ export function observationFacts(
     overrides['Probe speed'] =
       `≈ ${formatVelocity(17, mode)} · relative to Sun`;
     overrides['Earth distance'] =
-      `≈ ${formatLength(172.36 * AU, mode)} · 172 AU · estimated, grows daily`;
+      `≈ ${factLength(172.36 * AU, mode)} · 172 AU · estimated, grows daily`;
   }
   if (id === 'proxima')
     overrides['Earth distance'] =
-      `≈ ${formatLength(4.25 * LY, mode)} · 4.25 light-years`;
+      `≈ ${factLength(4.25 * LY, mode)} · 4.25 light-years`;
   if (id === 'sagittarius-a') {
     overrides['Earth distance'] =
-      `≈ ${formatLength(26000 * LY, mode)} · 26,000 light-years`;
+      `≈ ${factLength(26000 * LY, mode)} · 26,000 light-years`;
     overrides['Horizon radius'] = `≈ ${formatLength(RS, mode)}`;
   }
   return OBSERVATION_FACTS[id].facts.map(([label, value]) => [

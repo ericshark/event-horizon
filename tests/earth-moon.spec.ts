@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { LEG_DURATIONS } from '../src/journey';
 import { hasHorizontalOverflow } from './helpers';
 
 test('intentional wheel starts one flight; momentum, modifiers, dialogs and touch do not queue flights', async ({
@@ -20,10 +21,26 @@ test('intentional wheel starts one flight; momentum, modifiers, dialogs and touc
   await wheel(30);
   await wheel(30);
   await expect(page.locator('body')).toHaveAttribute('data-playback', 'flying');
-  for (let i = 0; i < 65; i++) {
-    await wheel(120);
-    await page.clock.fastForward(100);
-  }
+  // Schedule inertia inside the page so host/render latency cannot create
+  // >300ms gaps that would correctly count as a fresh intentional gesture.
+  await page.evaluate(() => {
+    (window as unknown as { __wheelInertia: number }).__wheelInertia =
+      window.setInterval(
+        () =>
+          document
+            .querySelector('#inspection')!
+            .dispatchEvent(
+              new WheelEvent('wheel', { deltaY: 120, bubbles: true }),
+            ),
+        100,
+      );
+  });
+  await page.clock.runFor(LEG_DURATIONS[0] * 1000 + 500);
+  await page.evaluate(() =>
+    clearInterval(
+      (window as unknown as { __wheelInertia: number }).__wheelInertia,
+    ),
+  );
   await expect(page.locator('#location')).toHaveText('Moon');
   await expect(page.locator('body')).toHaveAttribute(
     'data-playback',
@@ -110,7 +127,7 @@ test('pointer drag/pinch, resizing, hidden-tab pause and native keyboard activat
   await page
     .getByRole('button', { name: 'Resume', exact: true })
     .press('Enter');
-  await page.clock.runFor(4000);
+  await page.clock.fastForward(LEG_DURATIONS[0] * 1000);
   await expect(page.locator('#location')).toHaveText('Moon');
   expect(await hasHorizontalOverflow(page)).toBe(false);
 });

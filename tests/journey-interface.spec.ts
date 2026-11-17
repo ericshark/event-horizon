@@ -112,3 +112,72 @@ test('inspection double activation toggles close-up and leaves Earth distance un
     )
     .toEqual(original.cameraPose?.position);
 });
+
+test('dismissing settings on the world does not begin an inspection drag', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const original = await page.evaluate(
+    () => window.__horizon!.state().cameraPose,
+  );
+  const surface = page.locator('#inspection');
+  await surface.dispatchEvent('pointerdown', {
+    pointerId: 1,
+    clientX: 250,
+    clientY: 200,
+    bubbles: true,
+  });
+  await surface.dispatchEvent('pointermove', {
+    pointerId: 1,
+    clientX: 310,
+    clientY: 240,
+    bubbles: true,
+  });
+  await surface.dispatchEvent('pointerup', {
+    pointerId: 1,
+    clientX: 310,
+    clientY: 240,
+    bubbles: true,
+  });
+  await expect(page.locator('#preference-controls')).toBeHidden();
+  expect(
+    await page.evaluate(() => window.__horizon!.state().cameraPose),
+  ).toEqual(original);
+});
+
+test('keyboard activation of the route jumps directly on touch-capable devices too', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const target = page.getByRole('button', {
+    name: 'Go to Jupiter',
+    exact: true,
+  });
+  await target.focus();
+  await target.press('Enter');
+  await expect(
+    page.getByRole('heading', { name: 'Jupiter', exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('#route-preview')).toBeHidden();
+});
+
+test('destination content stays separate from instruments across desktop, phone and landscape', async ({
+  page,
+}) => {
+  await page.goto('/#proxima');
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 1366, height: 768 },
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const panel = await page.locator('.flight-panel').boundingBox();
+    const instruments = await page.locator('#timed-instruments').boundingBox();
+    expect(
+      panel!.y + panel!.height + 8,
+      `${viewport.width}x${viewport.height}`,
+    ).toBeLessThanOrEqual(instruments!.y);
+  }
+});

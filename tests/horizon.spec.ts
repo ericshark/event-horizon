@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { CHECKPOINTS, LEG_DURATIONS } from '../src/journey';
 import {
+  chooseStop,
+  openSettings,
   collectErrors,
   hasHorizontalOverflow,
   screenshotContrast,
@@ -13,15 +15,13 @@ test('all stops through visible controls, timed forward/reverse flights, inspect
   const errors = collectErrors(page);
   await page.clock.install();
   await page.goto('/');
-  await expect(page.locator('#checkpoints option')).toHaveCount(13);
-  await expect(
-    page.getByRole('button', { name: 'Previous', exact: true }),
-  ).toBeDisabled();
+  await expect(page.locator('.route-stop')).toHaveCount(13);
+  await expect(page.getByRole('button', { name: /^Previous/ })).toBeDisabled();
   for (let i = 0; i < CHECKPOINTS.length; i++) {
     await expect(page.locator('#location')).toHaveText(CHECKPOINTS[i].name);
-    await expect(page.locator('#checkpoint-count')).toHaveText(
-      `${String(i + 1).padStart(2, '0')} / 13`,
-    );
+    await expect(
+      page.locator(`.route-stop[data-stop="${CHECKPOINTS[i].id}"]`),
+    ).toHaveAttribute('aria-current', 'step');
     await expect(page.locator('#observation-facts > div')).toHaveCount(3);
     await expect(page.locator('#speed-digits')).toHaveAttribute(
       'data-value',
@@ -33,9 +33,10 @@ test('all stops through visible controls, timed forward/reverse flights, inspect
       await page.keyboard.press('ArrowRight');
       await page.keyboard.press('+');
       await page.clock.runFor(100);
-      await page.getByRole('button', { name: 'Reset view' }).press('Enter');
+      await page.locator('#inspection').focus();
+      await page.keyboard.press('Home');
       await page.screenshot({
-        path: `artifacts/eh-02/${info.project.name}-${CHECKPOINTS[i].id}.png`,
+        path: `artifacts/journey-through-space/eh-02/${info.project.name}-${CHECKPOINTS[i].id}.png`,
         animations: 'disabled',
       });
     }
@@ -76,9 +77,7 @@ test('all stops through visible controls, timed forward/reverse flights, inspect
   );
   await page.keyboard.press('Escape');
   for (let i = CHECKPOINTS.length - 1; i > 0; i--) {
-    await page
-      .getByRole('button', { name: 'Previous', exact: true })
-      .press('Enter');
+    await page.getByRole('button', { name: /^Previous/ }).press('Enter');
     await page.clock.fastForward(LEG_DURATIONS[i - 1] * 1000 + 100);
     await page.clock.fastForward(600);
     await expect(page.locator('#location')).toHaveText(CHECKPOINTS[i - 1].name);
@@ -87,13 +86,13 @@ test('all stops through visible controls, timed forward/reverse flights, inspect
   expect(errors).toEqual([]);
 });
 
-test('direct picker, hash redirects, invalid links, and history always settle with zero speed', async ({
+test('direct route, hash redirects, invalid links, and history always settle with zero speed', async ({
   page,
 }) => {
   const errors = collectErrors(page);
   await page.goto('/#saturn');
   await expect(page.locator('#location')).toHaveText('Saturn');
-  await page.locator('#checkpoints').selectOption('proxima');
+  await chooseStop(page, 'proxima');
   await expect(page.locator('#location')).toHaveText('Proxima Centauri');
   await page.goBack();
   await expect(page.locator('#location')).toHaveText('Saturn');
@@ -126,6 +125,7 @@ test('direct picker, hash redirects, invalid links, and history always settle wi
     );
     await expect(page.locator('#ending')).toBeHidden();
   }
+  await openSettings(page);
   await page.getByRole('button', { name: 'Sources', exact: true }).click();
   await expect(page.locator('#sources')).toContainText('not Horizons vectors');
   await expect(page.locator('#sources')).toContainText('11.8 million km');
@@ -137,16 +137,18 @@ test('maximum galactic speed and growing digits fit a fixed instrument width', a
 }, info) => {
   await page.clock.install();
   await page.goto('/#proxima');
-  const width = await page
-    .locator('#speed-digits')
-    .evaluate((el) => el.getBoundingClientRect().width);
+  await expect(page.locator('#speed-readout')).toBeHidden();
   await page
     .getByRole('button', { name: 'Next · Sagittarius A*' })
     .press('Enter');
-  await page.clock.fastForward(19000);
+  await page.clock.fastForward(LEG_DURATIONS.at(-1)! * 500);
   await page.getByRole('button', { name: 'Pause', exact: true }).press('Enter');
   const value = await page.locator('#speed-digits').getAttribute('data-value');
   expect(Number(value)).toBeGreaterThan(1e18);
+  const width = await page
+    .locator('#speed-digits')
+    .evaluate((el) => el.getBoundingClientRect().width);
+  await page.clock.fastForward(1000);
   expect(
     await page
       .locator('#speed-digits')
@@ -167,7 +169,7 @@ test('maximum galactic speed and growing digits fit a fixed instrument width', a
   ).toBe(true);
   expect(await hasHorizontalOverflow(page)).toBe(false);
   await page.screenshot({
-    path: `artifacts/eh-02/${info.project.name}-maximum-speed.png`,
+    path: `artifacts/journey-through-space/eh-02/${info.project.name}-maximum-speed.png`,
   });
   await page.getByRole('button', { name: 'Skip flight' }).press('Enter');
   await page.clock.fastForward(600);
@@ -177,18 +179,16 @@ test('maximum galactic speed and growing digits fit a fixed instrument width', a
   );
 });
 
-test('distance rail retains selectable grouped markers at galactic scale', async ({
+test('named schematic route reaches every stop even at galactic scale', async ({
   page,
 }) => {
   await page.goto('/#sagittarius-a');
-  await page
-    .getByRole('button', { name: 'Journey detail', exact: true })
-    .click();
-  await page.locator('.axis-marker').first().click();
-  await expect(page.locator('#cluster')).toBeVisible();
-  await expect(page.locator('#cluster-list')).toContainText('Earth');
-  await page.locator('#cluster-list a[href="#earth"]').click();
+  await expect(page.locator('.route-stop')).toHaveCount(13);
+  await chooseStop(page, 'earth');
   await expect(page.locator('#location')).toHaveText('Earth');
+  await chooseStop(page, 'sagittarius-a');
+  await expect(page.locator('#location')).toHaveText('Sagittarius A*');
+  await expect(page.locator('#ending')).toBeHidden();
 });
 
 test('failed imagery and no-WebGL preserve navigation, facts and safe final observation', async ({
@@ -213,7 +213,7 @@ test('failed imagery and no-WebGL preserve navigation, facts and safe final obse
   });
   await page.reload();
   await expect(page.locator('html')).toHaveClass(/no-webgl/);
-  await page.locator('#checkpoints').selectOption('sagittarius-a');
+  await chooseStop(page, 'sagittarius-a');
   await expect(page.locator('#location')).toHaveText('Sagittarius A*');
   await expect(page.locator('#observation-facts > div')).toHaveCount(3);
   await expect(page.locator('#ending')).toBeHidden();
@@ -232,14 +232,14 @@ test('short viewport, scene contrast and real-time outer-planet flight', async (
     )
     .toBeGreaterThan(5);
   await page.screenshot({
-    path: `artifacts/eh-02/${info.project.name}-short-jupiter.png`,
+    path: `artifacts/journey-through-space/eh-02/${info.project.name}-short-jupiter.png`,
   });
   await page.getByRole('button', { name: 'Next · Saturn' }).click();
-  await expect(page.locator('.flight-panel')).toHaveCSS('opacity', '0');
+  await expect(page.locator('.flight-panel')).toBeHidden();
   await expect(page.locator('body')).toHaveAttribute(
     'data-playback',
     'observing',
-    { timeout: 25000 },
+    { timeout: LEG_DURATIONS[6] * 1000 + 15000 },
   );
   await expect(page.locator('#location')).toHaveText('Saturn');
   expect(await hasHorizontalOverflow(page)).toBe(false);

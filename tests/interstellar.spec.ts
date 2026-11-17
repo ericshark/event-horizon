@@ -18,6 +18,9 @@ import {
 } from '../src/scenery';
 import { buildVoyager, voyagerExtent } from '../src/voyager';
 import {
+  chooseStop,
+  openSettings,
+  closeSettings,
   brightColor,
   collectErrors,
   hasHorizontalOverflow,
@@ -36,24 +39,18 @@ function sample(from: number, direction: 1 | -1, step = 0.05) {
   return { frames, final: c.tick(duration * 1000 + 1), duration };
 }
 
-test('Neptune→Voyager, Voyager→Proxima and Proxima→Sagittarius A* keep the 26/34/50 s timing and derived speed', () => {
-  for (const [from, seconds] of [
-    [9, 26],
-    [10, 34],
-    [11, 50],
-  ] as const) {
-    expect(LEG_DURATIONS[from]).toBe(seconds);
+test('outer and interstellar flights follow their authored duration and true speed envelope', () => {
+  for (const from of [9, 10, 11]) {
+    const seconds = LEG_DURATIONS[from];
     const { frames, final } = sample(from, 1, 0.1);
     expect(final.playback).toBe('observing');
     expect(final.now).toBe(from + 1);
     expect(frames.every((f) => f.playback === 'flying')).toBe(true);
-    const moving =
-      seconds - Math.min(2, 0.15 * seconds) - Math.min(1.2, 0.12 * seconds);
-    const plateau = LEG_LENGTHS[from] / (0.625 * moving);
     const peak = Math.max(...frames.map((f) => f.speedKmS));
-    expect(peak).toBeGreaterThan(plateau * 0.999);
-    expect(peak).toBeLessThanOrEqual(plateau * (1 + 1e-9));
-    expect(frames[0].speedKmS).toBe(0);
+    expect(peak).toBeGreaterThan(LEG_LENGTHS[from] / seconds);
+    expect(frames[0].speedKmS).toBeGreaterThan(0);
+    expect((frames[0].speedKmS * 3600) / 1.609344).toBeLessThan(100);
+    expect(frames.at(-1)!.speedKmS).toBeLessThan(peak * 0.01);
   }
 });
 
@@ -139,7 +136,9 @@ test('Voyager has dish, core, booms and antennas; its silhouette fits at maximum
 });
 
 test('audio targets follow the snapshot: silent when off, paused or hidden, no steps', () => {
-  const run = sample(11, 1, 0.05);
+  // Sample at 40 Hz; the new ramp has a steeper but continuous final rise.
+  // Web Audio also smooths these targets with its existing 0.22-second constant.
+  const run = sample(11, 1, 0.025);
   const on = run.frames.map((f) => audioTargets(f, true));
   expect(audioTargets(run.frames[200], false).master).toBe(0);
   expect(audioTargets(run.frames[200], true, false).master).toBe(0);
@@ -220,7 +219,7 @@ for (const [id, name] of [
     await expect(page.locator('#location')).toHaveText(name);
     await ready(page);
     const rest = await page.screenshot({
-      path: `artifacts/eh-04/${info.project.name}-${id}.png`,
+      path: `artifacts/journey-through-space/eh-04/${info.project.name}-${id}.png`,
     });
     expect(await screenshotContrast(page, rest)).toBeGreaterThan(8);
     const region = page.getByRole('region', { name: 'Inspect world' });
@@ -229,7 +228,7 @@ for (const [id, name] of [
     for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(600);
     const zoomed = await page.screenshot({
-      path: `artifacts/eh-04/${info.project.name}-${id}-max-zoom.png`,
+      path: `artifacts/journey-through-space/eh-04/${info.project.name}-${id}-max-zoom.png`,
     });
     expect(await screenshotContrast(page, zoomed)).toBeGreaterThan(8);
     const color = await brightColor(
@@ -259,6 +258,7 @@ test('audio lifecycle: off by default, explicit toggle, persistence, pause, hidd
     context: 'none',
     preference: false,
   });
+  await openSettings(page);
   const toggle = page.getByRole('button', { name: /Sound/ });
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await toggle.click();
@@ -268,13 +268,14 @@ test('audio lifecycle: off by default, explicit toggle, persistence, pause, hidd
   await page.reload();
   await ready(page);
   expect((await audio()).preference).toBe(true);
+  await openSettings(page);
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-  if ((await audio()).status === 'blocked') {
-    await expect(toggle).toContainText('tap to allow');
-    await toggle.click();
-  }
+  // Opening settings is a real gesture, which the audio adapter uses to
+  // resume a stored preference. Await that asynchronous resume rather than
+  // racing a transient blocked status and toggling sound off again.
   await expect.poll(async () => (await audio()).status).toBe('on');
 
+  await closeSettings(page);
   await page.getByRole('button', { name: /^Next · Voyager 1/ }).click();
   await expect(page.locator('body')).toHaveAttribute('data-playback', 'flying');
   await expect
@@ -313,10 +314,11 @@ test('audio lifecycle: off by default, explicit toggle, persistence, pause, hidd
   await expect(page.locator('#location')).toHaveText('Voyager 1');
   await expect.poll(async () => (await audio()).targets.drive).toBe(0);
   // Direct jump while sound is active.
-  await page.locator('#checkpoints').selectOption('proxima');
+  await chooseStop(page, 'proxima');
   await expect(page.locator('#location')).toHaveText('Proxima Centauri');
   expect((await audio()).targets.drive).toBe(0);
   // Disable: silent, preference stored, context suspended.
+  await openSettings(page);
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(async () => (await audio()).targets.master).toBe(0);
@@ -324,7 +326,9 @@ test('audio lifecycle: off by default, explicit toggle, persistence, pause, hidd
     .poll(async () => (await audio()).context, { timeout: 5000 })
     .toBe('suspended');
   expect(
-    await page.evaluate(() => localStorage.getItem('event-horizon.sound')),
+    await page.evaluate(() =>
+      localStorage.getItem('journey-through-space.sound'),
+    ),
   ).toBe('off');
   expect(errors).toEqual([]);
 });
@@ -342,6 +346,7 @@ test('missing or denied audio leaves silent travel usable without errors', async
   await page.goto('/#neptune');
   await ready(page);
   await expect(page.locator('#sound-toggle')).toBeHidden();
+  await closeSettings(page);
   await page.getByRole('button', { name: /^Next · Voyager 1/ }).click();
   await expect(page.locator('body')).toHaveAttribute('data-playback', 'flying');
   await page.getByRole('button', { name: 'Skip flight' }).click();
@@ -366,10 +371,10 @@ test('Voyager→Proxima→Sagittarius A* real-time flights keep evolving scenery
   const thrust: number[] = [];
   const weights: Record<string, number>[] = [];
   const started = Date.now();
-  for (const [i, at] of [6, 16, 26, 36, 44, 48].entries()) {
+  for (const [i, at] of [6, 18, 30, 44, 54, 58].entries()) {
     await page.waitForTimeout(Math.max(0, at * 1000 - (Date.now() - started)));
     const shot = await page.screenshot({
-      path: `artifacts/eh-04/${info.project.name}-proxima-sgra-${i}.png`,
+      path: `artifacts/journey-through-space/eh-04/${info.project.name}-proxima-sgra-${i}.png`,
     });
     expect(await screenshotContrast(page, shot)).toBeGreaterThan(2);
     const sample = await page.evaluate(() => ({

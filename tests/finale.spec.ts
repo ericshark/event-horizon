@@ -107,9 +107,8 @@ test('explicit entry, safe observation, pause/finish and replay through visible 
   await page.waitForTimeout(350);
   await expect(page.locator('#ending')).toBeHidden();
   await expect(page.locator('#observation-facts > div')).toHaveCount(3);
-  await page
-    .getByRole('button', { name: 'Zoom in', exact: true })
-    .press('Enter');
+  await page.locator('#inspection').focus();
+  await page.keyboard.press('+');
   await page.locator('#inspection').focus();
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowUp');
@@ -121,7 +120,7 @@ test('explicit entry, safe observation, pause/finish and replay through visible 
   );
   await page.getByRole('button', { name: 'Close details' }).press('Enter');
   await page.screenshot({
-    path: `artifacts/eh-05/${info.project.name}-observation.png`,
+    path: `artifacts/journey-through-space/eh-05/${info.project.name}-observation.png`,
   });
   expect(
     await screenshotContrast(
@@ -134,7 +133,7 @@ test('explicit entry, safe observation, pause/finish and replay through visible 
     await page.setViewportSize({ width: 1366, height: 768 });
     expect(await hasHorizontalOverflow(page)).toBe(false);
     await page.screenshot({
-      path: 'artifacts/eh-05/desktop-short-observation.png',
+      path: 'artifacts/journey-through-space/eh-05/desktop-short-observation.png',
     });
     await page.setViewportSize(viewport);
   }
@@ -144,7 +143,9 @@ test('explicit entry, safe observation, pause/finish and replay through visible 
   await expect(
     page.getByRole('button', { name: 'Pause', exact: true }),
   ).toBeFocused();
-  await expect(page.locator('#speed-label')).toHaveText('Horizon approach');
+  await expect(page.locator('#descent-instrument')).toContainText(
+    'Distance to horizon',
+  );
   await expect(page.locator('#speed-readout')).toBeHidden();
   await expect(page.locator('#horizon-radius')).toBeVisible();
   await page.getByRole('button', { name: 'Pause', exact: true }).press('Enter');
@@ -168,7 +169,7 @@ test('explicit entry, safe observation, pause/finish and replay through visible 
   ).toBeFocused();
   expect(await hasHorizontalOverflow(page)).toBe(false);
   await page.screenshot({
-    path: `artifacts/eh-05/${info.project.name}-ending.png`,
+    path: `artifacts/journey-through-space/eh-05/${info.project.name}-ending.png`,
   });
   await page
     .getByRole('link', { name: 'Return to Earth', exact: true })
@@ -185,7 +186,9 @@ test('explicit entry, safe observation, pause/finish and replay through visible 
     .getByRole('button', { name: 'Next · Moon', exact: true })
     .press('Enter');
 
-  await expect(page.locator('#location')).toHaveText('Moon');
+  await expect(page.locator('#location')).toHaveText('Moon', {
+    timeout: 30000,
+  });
   expect(errors).toEqual([]);
 });
 
@@ -209,12 +212,14 @@ test('real-time final handoff and uninterrupted twenty-second descent', async ({
   expect(errors).toEqual([]);
   expect(await hasHorizontalOverflow(page)).toBe(false);
   await page.screenshot({
-    path: `artifacts/eh-05/${info.project.name}-realtime-ending.png`,
+    path: `artifacts/journey-through-space/eh-05/${info.project.name}-realtime-ending.png`,
   });
   await page.close();
   await page
     .video()!
-    .saveAs(`artifacts/eh-05/${info.project.name}-handoff-descent.webm`);
+    .saveAs(
+      `artifacts/journey-through-space/eh-05/${info.project.name}-handoff-descent.webm`,
+    );
 });
 
 test('short viewport and static fallback retain explicit ending, replay and sound preference', async ({
@@ -241,14 +246,14 @@ test('short viewport and static fallback retain explicit ending, replay and soun
     .getByRole('button', { name: 'Enter the event horizon', exact: true })
     .click();
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
-  await expect(page.locator('#playback-label')).toHaveText('Paused');
+  await expect(page.locator('body')).toHaveAttribute('data-playback', 'paused');
   await page
     .getByRole('button', { name: 'Finish descent', exact: true })
     .click();
   await expect(page.locator('#ending')).toBeVisible();
   expect(await hasHorizontalOverflow(page)).toBe(false);
   await page.screenshot({
-    path: `artifacts/eh-05/${info.project.name}-short-fallback-ending.png`,
+    path: `artifacts/journey-through-space/eh-05/${info.project.name}-short-fallback-ending.png`,
   });
   await page
     .getByRole('link', { name: 'Return to Earth', exact: true })

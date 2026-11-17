@@ -4,3 +4,6 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 .DS_Store
+
+# Reproducible local verification captures for the interface redesign.
+/artifacts/journey-through-space/

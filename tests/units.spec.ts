@@ -153,3 +153,15 @@ test('rolling digits immediately announce changed units even inside throttled up
   });
   expect(labels).toEqual(['100 miles per hour', '161 kilometres per hour']);
 });
+
+test('astronomical observation lengths stay readable in ordinary selected units', () => {
+  expect(observationFacts('proxima', 'miles')).toContainEqual([
+    'Earth distance',
+    '≈ 24.98 trillion mi · 4.25 light-years',
+  ]);
+  expect(
+    observationFacts('sagittarius-a', 'kilometres').find(
+      ([label]) => label === 'Earth distance',
+    )![1],
+  ).toMatch(/^≈ 245\.98 quadrillion km/);
+});

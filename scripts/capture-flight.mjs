@@ -1,8 +1,9 @@
-/** Record representative real-time motion. Requires a running verification server. */
+/** Record the current journey's real-time motion. Requires a verification server. */
 import { chromium } from '@playwright/test';
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
-const output = 'artifacts/motion/eh-02';
+import { mkdir, writeFile } from 'node:fs/promises';
+const output = 'artifacts/journey-through-space/motion';
+const target = process.env.PREVIEW_URL || 'http://127.0.0.1:5201';
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({
   executablePath:
@@ -19,38 +20,89 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 const errors = [];
+const recordings = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (e) => {
   if (e.type() === 'error') errors.push(e.text());
 });
+async function record(label, button, seconds) {
+  await page.evaluate(() => {
+    window.__captureSamples = [];
+    window.__captureTimer = setInterval(() => {
+      const state = window.__horizon.state();
+      window.__captureSamples.push({
+        elapsed: state.elapsed,
+        playback: state.playback,
+        phase: state.flightPhase,
+        speedKmS: state.speedKmS,
+        thrust: state.thrust,
+        routeKm: state.routeKm,
+        earthKm: state.earthKm,
+        cameraPose: state.cameraPose,
+        displayedSpeed: document.querySelector('#speed-digits').dataset.value,
+        displayedDistance: document.querySelector('#earth-miles').textContent,
+      });
+    }, 250);
+  });
+  await page.locator(button).click();
+  const started = Date.now();
+  for (const [i, fraction] of [0.05, 0.15, 0.4, 0.6, 0.85, 0.98].entries()) {
+    await page.waitForTimeout(
+      Math.max(0, seconds * fraction * 1000 - (Date.now() - started)),
+    );
+    await page.screenshot({ path: `${output}/${label}-${i}.png` });
+  }
+  await page.waitForFunction(
+    () => ['observing', 'complete'].includes(document.body.dataset.playback),
+    null,
+    { timeout: (seconds + 15) * 1000 },
+  );
+  const samples = await page.evaluate(() => {
+    clearInterval(window.__captureTimer);
+    return window.__captureSamples;
+  });
+  recordings.push({
+    label,
+    authoredSeconds: seconds,
+    observedMilliseconds: Date.now() - started,
+    samples,
+  });
+}
 try {
-  await page.goto(process.env.PREVIEW_URL || 'http://127.0.0.1:5201');
-  for (const [id, destination, seconds] of [
-    ['earth', 'Moon', 6],
-    ['jupiter', 'Saturn', 18],
-    ['proxima', 'Sagittarius A*', 50],
+  await page.goto(target);
+  for (const [id, seconds] of [
+    ['earth', 16],
+    ['jupiter', 28],
+    ['proxima', 60],
   ]) {
-    await page.locator('#checkpoints').selectOption(id);
+    await page.locator(`.route-stop[data-stop="${id}"]`).click();
     await page.waitForFunction(
-      (id) => document.body.dataset.checkpoint === id,
+      (id) =>
+        document.body.dataset.checkpoint === id &&
+        document.body.dataset.playback === 'observing',
       id,
     );
-    await page
-      .getByRole('button', { name: `Next · ${destination}`, exact: true })
-      .click();
-    await page.waitForFunction(
-      () => document.body.dataset.playback === 'observing',
-      null,
-      { timeout: (seconds + 15) * 1000 },
-    );
-    await page.waitForTimeout(600);
+    await page.waitForFunction(() => window.__horizon.render()?.pending === 0);
+    await record(`${id}-forward`, '#next', seconds);
+    if (id === 'earth') {
+      await page.locator('#inspection').focus();
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('ArrowUp');
+      await page.keyboard.press('+');
+      await record('moon-inspected-reverse', '#previous', 16);
+    }
   }
+  await record('horizon-descent', '#next', 20);
   if (errors.length) throw new Error(errors.join('\n'));
 } finally {
+  await writeFile(
+    `${output}/samples.json`,
+    JSON.stringify({ target, errors, recordings }, null, 2),
+  );
   await context.close();
   await page.video().saveAs(`${output}/flight-review.webm`);
   await browser.close();
 }
 console.log(
-  `Recorded Earth–Moon, Jupiter–Saturn, Proxima–Sagittarius A*: ${output}/flight-review.webm`,
+  `Recorded forward/reverse departure, outer planets, final leg and descent: ${output}/flight-review.webm`,
 );

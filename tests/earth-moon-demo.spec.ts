@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { LEG_DURATIONS } from '../src/journey';
 import { collectErrors, hasHorizontalOverflow } from './helpers';
 test.use({ video: 'on' });
-test('Earth inspection, six-second flight, pause/resume, Moon inspection and reverse', async ({
+test('Earth inspection, gradual flight, pause/resume, Moon inspection and reverse', async ({
   page,
 }, info) => {
   const errors = collectErrors(page);
@@ -9,9 +10,7 @@ test('Earth inspection, six-second flight, pause/resume, Moon inspection and rev
   await expect(page.locator('#location')).toHaveText('Earth');
   await expect(page.locator('#observation-facts > div')).toHaveCount(3);
   await expect(page.locator('#earth-miles')).toHaveText('16,386 mi');
-  await expect(
-    page.getByRole('button', { name: 'Previous', exact: true }),
-  ).toBeDisabled();
+  await expect(page.getByRole('button', { name: /^Previous/ })).toBeDisabled();
   const scene = page.getByRole('region', { name: 'Inspect world' });
   const canonical = await page.evaluate(
     () => window.__horizon!.state().cameraPose,
@@ -22,12 +21,13 @@ test('Earth inspection, six-second flight, pause/resume, Moon inspection and rev
   await expect
     .poll(() => page.evaluate(() => window.__horizon!.state().cameraPose))
     .not.toEqual(canonical);
-  await page.getByRole('button', { name: 'Reset view' }).click();
+  await scene.focus();
+  await page.keyboard.press('Home');
   await expect
     .poll(() => page.evaluate(() => window.__horizon!.state().cameraPose))
     .toEqual(canonical);
   await page.screenshot({
-    path: `artifacts/${info.project.name}-timed-earth.png`,
+    path: `artifacts/journey-through-space/${info.project.name}-timed-earth.png`,
   });
   await page.getByRole('button', { name: 'Next · Moon' }).click();
   await expect(
@@ -38,7 +38,7 @@ test('Earth inspection, six-second flight, pause/resume, Moon inspection and rev
     /[1-9]\d+/,
   );
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
-  await expect(page.locator('#playback-label')).toHaveText('Paused');
+  await expect(page.locator('body')).toHaveAttribute('data-playback', 'paused');
   const frozen = await page.locator('#speed-digits').getAttribute('data-value');
   await page.waitForTimeout(250);
   expect(await page.locator('#speed-digits').getAttribute('data-value')).toBe(
@@ -46,7 +46,7 @@ test('Earth inspection, six-second flight, pause/resume, Moon inspection and rev
   );
   await page.getByRole('button', { name: 'Resume', exact: true }).click();
   await expect(page.locator('#location')).toHaveText('Moon', {
-    timeout: 15000,
+    timeout: LEG_DURATIONS[0] * 1000 + 10000,
   });
   await expect(
     page.getByRole('button', { name: 'Next · Mercury' }),
@@ -56,14 +56,14 @@ test('Earth inspection, six-second flight, pause/resume, Moon inspection and rev
     '0',
   );
   await page.screenshot({
-    path: `artifacts/${info.project.name}-timed-moon.png`,
+    path: `artifacts/journey-through-space/${info.project.name}-timed-moon.png`,
   });
   await scene.focus();
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('-');
-  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await page.getByRole('button', { name: /^Previous/ }).click();
   await expect(page.locator('#location')).toHaveText('Earth', {
-    timeout: 15000,
+    timeout: LEG_DURATIONS[0] * 1000 + 10000,
   });
   await expect(page.locator('body')).toHaveAttribute(
     'data-playback',
@@ -74,5 +74,7 @@ test('Earth inspection, six-second flight, pause/resume, Moon inspection and rev
   await page.close();
   await page
     .video()!
-    .saveAs(`artifacts/${info.project.name}-earth-moon-round-trip.webm`);
+    .saveAs(
+      `artifacts/journey-through-space/${info.project.name}-earth-moon-round-trip.webm`,
+    );
 });

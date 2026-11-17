@@ -1,4 +1,4 @@
-# event-horizon deployment
+# Journey Through Space deployment
 
 Production: https://event-horizon.ericzwierzynski.dev
 
@@ -20,3 +20,14 @@ previous production deployment, then verify the production URL again.
 Verified on November 16, 2026: DNS, HTTPS, and an HTTP 200 response at the custom
 URL. This setup uses the existing Vercel Hobby project and Cloudflare DNS; no
 paid resources were added.
+
+## Rename coordination
+
+The local application is now named Journey Through Space (`journey-through-space`).
+The user will rename the GitHub repository, Vercel project, and custom domain
+later; no remote rename, push, DNS mutation, or production release was performed
+by the interface implementation. The hosting configuration above remains the
+last verified setup. The intended future hostname is
+`journey-through-space.ericzwierzynski.dev`; its availability and HTTPS have not
+been established by this work. Preserve the existing domain until its migration
+behavior is explicitly chosen.

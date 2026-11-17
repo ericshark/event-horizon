@@ -1,6 +1,6 @@
 # Journey Through Space: quieter interface and coherent flight motion
 
-Status: ready-for-agent
+Status: in-progress
 Date: 2026-11-16
 Scope: specification only; implementation and infrastructure changes are subsequent work.
 
@@ -221,3 +221,11 @@ Exact spacing compression, arc dimensions, breakpoints, typography, rounded prec
 - [Existing deployment record](../../docs/DEPLOYMENT.md): current recorded repository, host, and custom-domain setup; verify actual state before rename work.
 - [Deployment workflow](/home/eric/.config/deployment-workflow/README.md): required operational rules for subsequent hosting/domain work.
 - The authoritative product decisions are the completed grilling conversation. The task tracker is local Markdown; this spec is published there with ready-for-agent status. Unresolved points above are explicit rather than inferred decisions.
+
+### Implementation clarifications confirmed by the user
+
+- Visible title: **Journey Through Space**. Repository, package, and folder identifier: `journey-through-space`.
+- Descent readout: **Distance to horizon** while outside, then **Inside the horizon** after crossing. The outside value is `(radius − horizon radius)`, rather than radius from the black-hole center.
+- Remote coordination: the user explicitly said **“ILL CHANGE LATER”** for repository and hosting renames after connected readbacks still showed the old identity. This implementation completes the local folder/package/branding rename; remote rename, DNS, and production release are deferred to the user. Preserve existing origin until that rename exists.
+- The implementation request approves the specified existing browser-facing and controller/science verification boundaries.
+- Authored route duration tuning is recorded in the flight verification report: 356 seconds total, with the unchanged optional 20-second descent.

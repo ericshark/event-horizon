@@ -75,3 +75,25 @@ export async function brightColor(page: Page, png: Buffer) {
     };
   }, png.toString('base64'));
 }
+
+/** Open preferences through the same visible control available to visitors. */
+export async function openSettings(page: Page) {
+  const trigger = page.locator('#settings-toggle');
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true')
+    await trigger.click();
+}
+
+export async function closeSettings(page: Page) {
+  const trigger = page.locator('#settings-toggle');
+  if ((await trigger.getAttribute('aria-expanded')) === 'true')
+    await trigger.click();
+}
+
+/** Touch previews first; desktop activation navigates immediately. */
+export async function chooseStop(page: Page, id: string) {
+  const stop = page.locator(`.route-stop[data-stop="${id}"]`);
+  await stop.scrollIntoViewIfNeeded();
+  await stop.click();
+  const go = page.locator('#route-go');
+  if (await go.isVisible()) await go.click();
+}

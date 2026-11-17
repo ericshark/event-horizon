@@ -6,9 +6,15 @@ import {
 } from '../src/controller';
 import { audioTargets } from '../src/audio';
 import { fovExpansion, streakStrength } from '../src/scenery';
-import { CHECKPOINTS } from '../src/journey';
+import { CHECKPOINTS, LEG_DURATIONS } from '../src/journey';
 import { LOAD_TIMEOUT_MS } from '../src/renderer';
-import { collectErrors, hasHorizontalOverflow } from './helpers';
+import {
+  chooseStop,
+  openSettings,
+  closeSettings,
+  collectErrors,
+  hasHorizontalOverflow,
+} from './helpers';
 
 test('motion policy, reduced inertia, and snapshot adapters preserve route and timing without a second clock', () => {
   expect(resolveReducedMotion('system', false)).toBe(false);
@@ -65,8 +71,8 @@ test('motion policy, reduced inertia, and snapshot adapters preserve route and t
   expect(reducedAudio.master).toBe(1);
   expect(reducedAudio.drive).toBeLessThan(fullAudio.drive);
 
-  // Arrival still completes at exact authored leg duration (6 s for Earth→Moon)
-  const arrived = c.tick(6000);
+  // Arrival still completes at exact authored leg duration
+  const arrived = c.tick(LEG_DURATIONS[0] * 1000);
   expect(arrived.playback).toBe('observing');
   expect(arrived.now).toBe(1);
   expect(arrived.reducedMotion).toBe(true);
@@ -128,7 +134,7 @@ async function assertNoControlOverlapAndTouchTargets(page: Page) {
     const nav = rectOf('#timed-navigation');
     const playback = rectOf('#playback-controls');
     const instruments = rectOf('#timed-instruments');
-    const checkpoints = rectOf('#checkpoints');
+    const checkpoints = rectOf('#rail');
     const notice = rectOf('#render-notice');
     return {
       undersized,
@@ -161,12 +167,13 @@ test('OS and override motion modes persist, update in place, disable tunnel/FOV/
   await page.clock.install();
   await page.goto('/');
 
-  // Default System mode follows OS reduced-motion preference
-  await expect(page.locator('#motion-mode')).toHaveValue('system');
-  await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
+  // Full is the initial choice even when the OS requests reduced motion
+  await openSettings(page);
+  await expect(page.locator('#motion-mode')).toHaveValue('full');
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
   expect(await page.evaluate(() => window.__horizon!.motion())).toEqual({
-    mode: 'system',
-    reduced: true,
+    mode: 'full',
+    reduced: false,
   });
 
   // Idle globe rotation stays still in reduced mode
@@ -174,18 +181,22 @@ test('OS and override motion modes persist, update in place, disable tunnel/FOV/
     const state = window.__horizon!.state() as TimedFrame;
     return state.reducedMotion;
   });
-  expect(initialRotation).toBe(true);
+  expect(initialRotation).toBe(false);
 
   // Override to Full while OS prefers reduced motion
   await page.locator('#motion-mode').selectOption('full');
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
   expect(
-    await page.evaluate(() => localStorage.getItem('event-horizon.motion')),
+    await page.evaluate(() =>
+      localStorage.getItem('journey-through-space.motion'),
+    ),
   ).toBe('full');
 
+  await closeSettings(page);
   // Launch Earth→Moon flight in Full mode, then switch to Reduced mid-flight without resetting progress
   await page.getByRole('button', { name: 'Next · Moon' }).press('Enter');
   await page.clock.runFor(1800);
+  await openSettings(page);
   const beforeSwitch = await page.evaluate(
     () => window.__horizon!.state() as TimedFrame,
   );
@@ -208,6 +219,7 @@ test('OS and override motion modes persist, update in place, disable tunnel/FOV/
     expect(await page.evaluate(() => window.__horizon!.render()?.fov)).toBe(40);
   }
 
+  await closeSettings(page);
   // Verify unblurred digits and <= 10 Hz update cadence over 1 second of active flight
   const cadence = await page.evaluate(() => {
     const el = document.querySelector('#speed-digits')!;
@@ -245,17 +257,18 @@ test('OS and override motion modes persist, update in place, disable tunnel/FOV/
   );
   expect(anyBlurred).toBe(false);
 
-  // Finish the 6-second flight and confirm arrival at Moon
-  await page.clock.fastForward(4500);
+  // Finish the authored flight and confirm arrival at Moon
+  await page.clock.fastForward(LEG_DURATIONS[0] * 1000);
   await expect(page.locator('#location')).toHaveText('Moon');
   await page.screenshot({
-    path: `artifacts/eh-06/${info.project.name}-reduced-moon.png`,
+    path: `artifacts/journey-through-space/eh-06/${info.project.name}-reduced-moon.png`,
     animations: 'disabled',
   });
 
   // Reload preserves explicit Reduced preference
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.reload();
+  await openSettings(page);
   await expect(page.locator('#motion-mode')).toHaveValue('reduced');
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
   expect(errors).toEqual([]);
@@ -316,6 +329,7 @@ test('keyboard-only inspection, focus transfer, polite announcements, dialog foc
   await expect(page.locator('#details')).toBeHidden();
   await expect(detailsBtn).toBeFocused();
 
+  await openSettings(page);
   const sourcesBtn = page.getByRole('button', { name: 'Sources', exact: true });
   await sourcesBtn.focus();
   await page.keyboard.press(' ');
@@ -325,7 +339,7 @@ test('keyboard-only inspection, focus transfer, polite announcements, dialog foc
   );
   await page.getByRole('button', { name: 'Close sources' }).press('Enter');
   await expect(page.locator('#sources')).toBeHidden();
-  await expect(sourcesBtn).toBeFocused();
+  await expect(page.locator('#settings-toggle')).toBeFocused();
 
   // Launch with keyboard transfers focus from hidden Next button to Pause and announces flight politely
   const nextBtn = page.getByRole('button', { name: 'Next · Moon' });
@@ -356,7 +370,7 @@ test('keyboard-only inspection, focus transfer, polite announcements, dialog foc
   await expect(page.locator('#journey-announcement')).toHaveText(
     'Flight resumed.',
   );
-  await page.clock.fastForward(6200);
+  await page.clock.fastForward(LEG_DURATIONS[0] * 1000 + 200);
   await expect(page.locator('#location')).toHaveText('Moon');
   await expect(page.locator('#journey-announcement')).toHaveText(
     'Arrived at Moon.',
@@ -431,7 +445,7 @@ test('mobile drag, pinch, pointercancel, and orientation/resize changes retain p
   expect(await page.evaluate(() => window.__horizon!.render()?.quality)).toBe(
     0.5,
   );
-  await page.clock.fastForward(4000);
+  await page.clock.fastForward(LEG_DURATIONS[0] * 1000);
   await expect(page.locator('#location')).toHaveText('Moon');
   expect(errors).toEqual([]);
 });
@@ -457,8 +471,8 @@ test('10-second texture load timeout enables illustrated fallback with concise n
   expect(midFlight.playback).toBe('flying');
   expect(midFlight.routeKm).toBeGreaterThan(0);
 
-  // Flight arrives at 6 s even before the 10 s texture timeout expires
-  await page.clock.fastForward(3100);
+  // Flight completes at its authored duration despite the pending texture
+  await page.clock.fastForward(LEG_DURATIONS[0] * 1000);
   await expect(page.locator('#location')).toHaveText('Moon');
   await expect(page.locator('body')).toHaveAttribute(
     'data-playback',
@@ -466,7 +480,7 @@ test('10-second texture load timeout enables illustrated fallback with concise n
   );
 
   // Advance past the 10 s load timeout: illustrated fallback activates and pending count reaches 0
-  await page.clock.fastForward(4500);
+  await page.clock.fastForward(LEG_DURATIONS[0] * 1000);
   await expect(page.locator('html')).toHaveAttribute(
     'data-texture-fallback',
     'true',
@@ -483,7 +497,7 @@ test('10-second texture load timeout enables illustrated fallback with concise n
   ).toBeGreaterThan(0);
   await assertNoControlOverlapAndTouchTargets(page);
   await page.screenshot({
-    path: `artifacts/eh-06/${info.project.name}-texture-timeout-fallback.png`,
+    path: `artifacts/journey-through-space/eh-06/${info.project.name}-texture-timeout-fallback.png`,
     animations: 'disabled',
   });
   await page.unroute('**/textures/moon.jpg');
@@ -509,15 +523,15 @@ test('no-WebGL disables and explains unsupported inspection affordances while ke
   await page.goto('/');
   await expect(page.locator('html')).toHaveClass(/no-webgl/);
   await expect(page.locator('#render-status')).toContainText(
-    'Static illustration mode · 3D inspection unavailable',
+    'Static illustration · 3D inspection unavailable',
   );
   await expect(page.locator('#inspection-hint')).toContainText(
-    '3D inspection unavailable in static illustration mode',
+    'Drag to explore',
   );
   await expect(page.locator('#inspection')).toHaveAttribute('inert', '');
-  await expect(page.getByRole('button', { name: 'Zoom in' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Zoom out' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Reset view' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Zoom in' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Zoom out' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Reset view' })).toHaveCount(0);
 
   // Flight, telemetry, and arrival still follow the exact schedule
   await page.getByRole('button', { name: 'Next · Moon' }).click();
@@ -525,11 +539,11 @@ test('no-WebGL disables and explains unsupported inspection affordances while ke
   expect(
     Number(await page.locator('#speed-digits').getAttribute('data-value')),
   ).toBeGreaterThan(1000);
-  await page.clock.fastForward(4000);
+  await page.clock.fastForward(LEG_DURATIONS[0] * 1000);
   await expect(page.locator('#location')).toHaveText('Moon');
   await assertNoControlOverlapAndTouchTargets(page);
   await page.screenshot({
-    path: `artifacts/eh-06/${info.project.name}-no-webgl-moon.png`,
+    path: `artifacts/journey-through-space/eh-06/${info.project.name}-no-webgl-moon.png`,
     animations: 'disabled',
   });
   expect(await hasHorizontalOverflow(page)).toBe(false);
@@ -575,7 +589,7 @@ test('WebGL context loss pauses travel and supports both 3D recovery and static 
   ).toBe(pausedState.elapsed);
   await assertNoControlOverlapAndTouchTargets(page);
   await page.screenshot({
-    path: `artifacts/eh-06/${info.project.name}-context-lost-paused.png`,
+    path: `artifacts/journey-through-space/eh-06/${info.project.name}-context-lost-paused.png`,
     animations: 'disabled',
   });
 
@@ -597,9 +611,9 @@ test('WebGL context loss pauses travel and supports both 3D recovery and static 
   await expect(page.locator('html')).toHaveClass(/no-webgl/);
   await expect(page.locator('#context-actions')).toBeHidden();
   await page.getByRole('button', { name: 'Resume', exact: true }).click();
-  await page.clock.fastForward(4000);
+  await page.clock.fastForward(LEG_DURATIONS[0] * 1000);
   await expect(page.locator('#location')).toHaveText('Moon');
-  await expect(page.getByRole('button', { name: 'Zoom in' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Zoom in' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -616,7 +630,7 @@ test('repeated navigation disposes non-resident scene nodes and textures', async
     'sagittarius-a',
     'earth',
   ]) {
-    await page.locator('#checkpoints').selectOption(id);
+    await chooseStop(page, id);
     await expect(page.locator('#location')).toHaveText(
       CHECKPOINTS.find((p) => p.id === id)!.name,
     );

@@ -120,10 +120,16 @@ function closePreview(focus = false) {
   if (focus && previewIndex >= 0)
     ($('#route-stops').children[previewIndex] as HTMLElement).focus();
 }
+function summary(stop: (typeof CHECKPOINTS)[number]) {
+  return stop.id === 'earth'
+    ? 'One blue world, a thin atmosphere, and everything we have ever called home.'
+    : (stop.description.match(/.*?[.!?](?:\s|$)/)?.[0].trim() ??
+        stop.description);
+}
 function preview(i: number) {
   previewIndex = i;
   $('#route-preview-text').textContent =
-    `${CHECKPOINTS[i].name} — ${CHECKPOINTS[i].description}`;
+    `${CHECKPOINTS[i].name} — ${summary(CHECKPOINTS[i])}`;
   $('#route-preview').hidden = false;
 }
 const touchRoute = () => matchMedia('(hover: none)').matches;
@@ -141,11 +147,9 @@ for (const [i, p] of CHECKPOINTS.entries()) {
   b.addEventListener('pointerenter', () => {
     if (!touchRoute()) preview(i);
   });
-  b.addEventListener('focus', () => {
-    if (!touchRoute()) preview(i);
-  });
-  b.addEventListener('click', () => {
-    if (touchRoute()) preview(i);
+  b.addEventListener('focus', () => preview(i));
+  b.addEventListener('click', (event) => {
+    if (touchRoute() && event.detail !== 0) preview(i);
     else {
       closePreview();
       void go(p.id);
@@ -164,12 +168,25 @@ $('#rail').addEventListener('pointerleave', () => {
 document.addEventListener('focusin', (e) => {
   if (!$('#rail').contains(e.target as Node)) closePreview();
 });
-document.addEventListener('pointerdown', (e) => {
-  const target = e.target as Node;
-  if (!$('#settings').contains(target)) closeSettings(false);
-  if (!$('#earth-distance').contains(target)) closeAuHelp(false);
-  if (!$('#rail').contains(target)) closePreview();
-});
+document.addEventListener(
+  'pointerdown',
+  (e) => {
+    const target = e.target as Node;
+    const dismissing =
+      !$('#preference-controls').hidden ||
+      !$('#au-help').hidden ||
+      !$('#route-preview').hidden;
+    if (dismissing && $('#inspection').contains(target)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      clearInspection();
+    }
+    if (!$('#settings').contains(target)) closeSettings(false);
+    if (!$('#earth-distance').contains(target)) closeAuHelp(false);
+    if (!$('#rail').contains(target)) closePreview();
+  },
+  { capture: true },
+);
 let navigationToken = 0;
 async function go(id: string, record = true, fade = true) {
   const restoreNavigationFocus = document.activeElement === $('#route-go');
@@ -274,7 +291,7 @@ function updateDetails() {
       .map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`)
       .join(
         '',
-      )}</dl><p class="note">${p.note}</p><p class="note">Earth distance is straight-line displacement from Earth's center, rounded in the selected units in the instrument. Tour distance follows the authored route. Inspection changes neither value. Virtual speed is the route-distance derivative. Facts and approximate model values: see the linked source and source limitations.${` <a href="${OBSERVATION_FACTS[p.id].source}" target="_blank" rel="noreferrer">NASA · ${p.name} reference</a>`}</p><p class="note">Distances and visibility are rescaled in the visuals. Warp streaks illustrate compressed travel, not an actual faster-than-light spacecraft. Reference positions are approximations, not Horizons vectors. Parker comparisons hold its record speed constant without acceleration or braking.</p>${p.kind === 'blackhole' ? '<p class="note">The bright ring is illustrative. Optical framing is independent of the scientific observation radius; spin and relativistic orbital evolution are omitted. The descent and dark interior are illustrative, not a survival or geodesic simulation; the radius is not a measured local velocity.</p>' : ''}`;
+      )}</dl><p class="note">${p.id === 'moon' ? `Mean Earth–Moon distance: ${formatLength(384400, unitMode)}. The lunar position is a mean-distance illustration, not a dated ephemeris.` : p.note}</p><p class="note">Earth distance is straight-line displacement from Earth's center, rounded in the selected units in the instrument. Tour distance follows the authored route. Inspection changes neither value. Virtual speed is the route-distance derivative. Facts and approximate model values: see the linked source and source limitations.${` <a href="${OBSERVATION_FACTS[p.id].source}" target="_blank" rel="noreferrer">NASA · ${p.name} reference</a>`}</p><p class="note">Distances and visibility are rescaled in the visuals. Warp streaks illustrate compressed travel, not an actual faster-than-light spacecraft. Reference positions are approximations, not Horizons vectors. Parker comparisons hold its record speed constant without acceleration or braking.</p>${p.kind === 'blackhole' ? '<p class="note">The bright ring is illustrative. Optical framing is independent of the scientific observation radius; spin and relativistic orbital evolution are omitted. The descent and dark interior are illustrative, not a survival or geodesic simulation; the radius is not a measured local velocity.</p>' : ''}`;
 }
 function isWebglActive() {
   return Boolean(renderer && !renderer.contextLost && !renderer.fallbackPinned);
@@ -313,7 +330,7 @@ function updateUI() {
   $('#inspection').inert = flying || !webgl;
   $('#inspection').setAttribute('aria-disabled', String(flying || !webgl));
   $('#location').textContent = p.name;
-  $('#description').textContent = p.description;
+  $('#description').textContent = summary(p);
   const key = `${s.now}:${unitMode}`;
   if ($('#observation-facts').dataset.stop !== key) {
     $('#observation-facts').dataset.stop = key;
@@ -340,6 +357,12 @@ function updateUI() {
   $('#playback-controls').hidden = !flying || complete;
   $('#pause-flight').textContent = s.playback === 'paused' ? 'Resume' : 'Pause';
   $('#skip-flight').textContent = descent ? 'Finish descent' : 'Skip flight';
+  $('#skip-flight').setAttribute(
+    'aria-description',
+    descent
+      ? 'Finish the illustrative descent'
+      : `Skip flight to ${CHECKPOINTS[s.next].name}`,
+  );
   $('#timed-instruments').hidden = complete;
   $('#speedometer').hidden = !flying || descent;
   $('#descent-instrument').hidden = !descent || complete;
@@ -348,7 +371,12 @@ function updateUI() {
   $('#earth-miles').textContent = earth.distance;
   $('#earth-context').textContent = earth.context;
   $('#au-help-toggle').hidden = !earth.context.includes('AU');
-  if ($('#au-help-toggle').hidden) closeAuHelp(false);
+  if ($('#au-help-toggle').hidden) {
+    const restoreFocus = document.activeElement === $('#au-help-toggle');
+    closeAuHelp(false);
+    if (restoreFocus)
+      (flying ? $('#pause-flight') : $('#settings-toggle')).focus();
+  }
   $('#au-help').textContent =
     `An astronomical unit (AU) is approximately the average Earth–Sun distance: ${formatLength(AU, unitMode)}.`;
   $('#speed-unit').textContent = speedUnit(unitMode);

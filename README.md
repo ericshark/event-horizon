@@ -1,9 +1,9 @@
-# Event Horizon — From Earth to the Unknown
+# Journey Through Space
 
 An interactive educational journey from Earth to Sagittarius A*, with 13
-observation stops and 12 timed flights totalling 236 active seconds. Inspect
+observation stops and 12 timed flights totalling 356 active seconds. Inspect
 worlds, travel forward or backward with Next/Previous or a deliberate wheel
-gesture, and pause or skip each flight. The picker and URL history open
+gesture, and pause or skip each flight. The named bottom route and URL history open
 observations directly through a short fade. Old destination links redirect to
 the next retained stop; old black-hole stage links open the safe observation.
 
@@ -41,7 +41,7 @@ is offset from the centre by **1,000 horizon radii**. Optical framing is authore
 independently. The lensed sky and bright accretion disk are illustrative; spin
 is omitted. Enter the event horizon explicitly starts a separate 20-second
 illustrative descent, with pause and finish controls. Horizon approach shows
-local radius instead of mph. The dark ending offers Return to Earth as a replay
+distance to the horizon instead of mph, then “Inside the horizon” after crossing. The dark ending offers Return to Earth as a replay
 reset, retaining sound preferences. Wheel input and old stage links never start
 descent. See [EH-05 verification](docs/verification/eh-05.md).
 Sources: [NASA mass and distance](https://www.nasa.gov/image-article/supermassive-black-hole-sagittarius/),
@@ -58,7 +58,10 @@ Saturn's rings. Segment-local arc-length tables avoid subtracting galactic
 coordinates to calculate speed. Analytic speed integrates to each leg's length;
 reverse travel displays positive speed. Direct selections and skips settle at
 zero. Earth distance is straight-line displacement and can decrease on a
-detour. Instruments always retain miles, with AU above 0.1 AU and ly above 0.1 ly.
+detour. Miles are the initial display units; settings switches all ordinary lengths and
+speeds to kilometres and km/h. AU appears above 0.1 AU and ly above 0.1 ly.
+Current distance from Earth is straight-line distance from Earth’s centre, not
+accumulated travel; inspecting a world does not change it.
 Route distance includes detours; its light-equivalent time is length/c, not
 playback time or a traveller's proper time. Parker comparisons assume constant
 record speed without acceleration, braking or fuel limits. This is not a
@@ -69,15 +72,31 @@ navigation-grade ephemeris or physically achievable spacecraft flight.
 - `science.ts`: units, physical constants, approximate reference positions.
 - `journey.ts`: catalog, sourced facts, durations, route sampling, legacy links.
 - `controller.ts`: monotonic active time, inspection, pause/resume/skip, immutable snapshots.
-- `flight.ts`: shared frame contract and proportional distance-rail grouping.
+- `flight.ts`: shared frame contract and legacy linear-distance utilities.
+- `units.ts` / `instruments.ts`: display conversions, curated fact presentation, and speed digits.
 - `renderer.ts`: one Three.js context, local scene origins, assets and camera application.
 - `main.ts`: semantic UI, navigation/history, input and snapshot-driven instruments.
 
 The complete route uses the timed controller; scroll position no longer owns
 playback. Hidden tabs return paused. Inspection changes neither scientific
-position nor route distance. Journey detail opens the truthful linear distance
-rail at rest, grouping nearby markers with a selectable linear inset. Transit
-retains instruments and playback controls; facts return during settling.
+position nor route distance. The bottom route is a schematic itinerary: gaps gently reflect authored flight
+durations and are not physical distance ratios. Hover or keyboard-focus a name
+for a short preview; activate it to jump directly. On touch, tap a name then Go.
+The route scrolls horizontally on narrow screens and keeps the current stop visible.
+Transit hides observation content and the route, retaining speed, distance,
+Pause/Resume, Skip, and the settings icon. Facts return at arrival.
+
+Double-click or double-tap the world to toggle normal framing and maximum
+close-up without changing the viewing angle. Drag, pinch, keyboard arrows,
+`+`/`−`, and Home/0 remain available; the visible zoom/reset buttons are gone.
+Previous/Next plays an adjacent flight rather than jumping.
+
+The speedometer’s number is virtual route speed in mph or km/h; its needle is
+relative to that leg’s peak, rather than a shared absolute speed scale.
+An analytic distance-aware ramp gives gentle early acceleration and smooth
+braking, with camera departure sampled from the same active clock. Visual
+space is deliberately compressed; scientific progress and speed retain their
+integral relationship. See [the revised duration table and numerical evidence](docs/verification/journey-through-space-flight.md).
 
 ## Rendering and verification
 
@@ -86,15 +105,20 @@ optional audio (EH-04), the Sagittarius A* finale (EH-05) and motion modes,
 keyboard/focus, load timeouts, context-loss recovery and static no-WebGL mode
 (EH-06) are integrated. Asset provenance is in `public/textures/credits.json`.
 All runtime assets are bundled locally; missing imagery uses illustrated
-materials. Reduced motion (System/Full/Reduced) covers every effect through the
-descent and ending, and sound pauses, skips and resets with playback.
+materials. Motion starts in Full, including when the OS requests reduced motion; choose
+Reduced or System in the top-right settings dropdown. Explicit motion, sound,
+and unit preferences persist, including legacy preferences from before the rename.
+Sound starts off. Reduced motion covers every effect through the descent and
+ending, and sound pauses, skips and resets with playback.
 
 Tests cover the exact itinerary and schedule, both directions on every leg,
 analytic speed integration, scientific path and camera clearance, safe galactic
 sampling, wheel ownership, pause/skip, inspection, direct/history/legacy links,
 maximum-width telemetry, responsive layout, source dialogs and fallback.
 Per-ticket evidence is in `docs/verification/eh-01.md`–`eh-06.md`; the final
-integrated acceptance report is [EH-07](docs/verification/eh-07.md).
+original integrated acceptance report is [EH-07](docs/verification/eh-07.md).
+The current redesign’s results are recorded in
+[Journey Through Space verification](docs/verification/journey-through-space.md).
 
 To record representative real-time Earth–Moon, Jupiter–Saturn and final
 Proxima–Sagittarius A* flights, start a verification server, then run:
@@ -104,6 +128,6 @@ PREVIEW_URL=http://127.0.0.1:5174 node scripts/capture-flight.mjs
 ```
 
 The capture script uses Playwright Chromium, saves
-`artifacts/motion/eh-02/flight-review.webm`, and closes its browser. Stop the
+`artifacts/journey-through-space/motion/flight-review.webm`, and closes its browser. Stop the
 verification server afterward. Recordings are software-rendered QA evidence,
 not a hardware performance benchmark.
