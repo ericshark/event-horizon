@@ -1,14 +1,16 @@
 # Journey Through Space deployment
 
-Production: https://event-horizon.ericzwierzynski.dev
+Production: https://journey-through-space.ericzwierzynski.dev
 
-Vercel project `event-horizon` in `Eric's projects` hosts the Vite frontend from
-GitHub `ericshark/event-horizon`, production branch `main`.
+Vercel project `journey-through-space` in `Eric's projects` hosts the Vite frontend from
+GitHub `ericshark/journey-through-space`, production branch `main`.
 The architecture is Browser → Vercel static assets.
 
 The custom domain is attached to the production environment. Cloudflare hosts
 its DNS-only CNAME using the project-specific target returned by Vercel.
-Existing Vercel addresses remain available. No backend custom domain was added.
+The previous hostname `event-horizon.ericzwierzynski.dev` stays attached to the
+project and permanently (308) redirects to the production URL. The default
+`event-horizon-six-lake.vercel.app` address remains available. No backend custom domain was added.
 No application environment variables are configured in Vercel.
 
 Push reviewed commits to `main`, check GitHub Actions when configured, and verify
@@ -17,17 +19,19 @@ if a build fails. If no Git deployment appears, deploy the exact Git commit thro
 Vercel rather than assuming the push released it. Roll back through Vercel's
 previous production deployment, then verify the production URL again.
 
-Verified on November 16, 2026: DNS, HTTPS, and an HTTP 200 response at the custom
-URL. This setup uses the existing Vercel Hobby project and Cloudflare DNS; no
+Verified on November 16, 2026: DNS, HTTPS, and an HTTP 200 response at the
+custom URL, and the old hostname redirecting to it. This setup uses the existing Vercel Hobby project and Cloudflare DNS; no
 paid resources were added.
 
-## Rename coordination
+## Rename history
 
-The local application is now named Journey Through Space (`journey-through-space`).
-The user will rename the GitHub repository, Vercel project, and custom domain
-later; no remote rename, push, DNS mutation, or production release was performed
-by the interface implementation. The hosting configuration above remains the
-last verified setup. The intended future hostname is
-`journey-through-space.ericzwierzynski.dev`; its availability and HTTPS have not
-been established by this work. Preserve the existing domain until its migration
-behavior is explicitly chosen.
+The project was renamed from Event Horizon to Journey Through Space
+(`journey-through-space`) on November 16, 2026. The GitHub repository and Vercel
+project were renamed in place (the Git link follows the repository ID, so
+deployments from `main` continue). `journey-through-space.ericzwierzynski.dev`
+was added with a DNS-only Cloudflare CNAME to the project's Vercel target, and the
+old hostname's record was kept so existing links redirect.
+
+The production deployment was not rebuilt by the rename: until the renamed
+application reaches `main` and is deployed, the new URL serves the last released
+build.

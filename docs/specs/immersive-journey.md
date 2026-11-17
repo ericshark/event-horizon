@@ -1,4 +1,4 @@
-# Event Horizon: interactive worlds and cinematic travel
+# Journey Through Space: interactive worlds and cinematic travel
 
 Status: implementation-ready specification. Product decisions and testing boundaries confirmed in conversation. This document specifies future behavior; it does not describe completed implementation.
 
