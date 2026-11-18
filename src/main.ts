@@ -400,14 +400,7 @@ function updateUI() {
     selected = s.now;
     for (const [i, el] of [...$('#route-stops').children].entries())
       el.setAttribute('aria-current', i === s.now ? 'step' : 'false');
-    if (!flying)
-      requestAnimationFrame(() =>
-        $('#route-stops').children[s.now]?.scrollIntoView({
-          block: 'nearest',
-          inline: 'center',
-          behavior: 'instant',
-        }),
-      );
+    if (!flying) revealCurrentStop(s.now);
   }
   if ($<HTMLDialogElement>('#details').open) updateDetails();
   const lost = renderer?.contextLost && !renderer.fallbackPinned;
@@ -421,6 +414,15 @@ function updateUI() {
         : renderer.pendingTextures
           ? 'Loading planetary imagery…'
           : '';
+}
+function revealCurrentStop(index: number) {
+  requestAnimationFrame(() =>
+    $('#route-stops').children[index]?.scrollIntoView({
+      block: 'nearest',
+      inline: 'center',
+      behavior: 'instant',
+    }),
+  );
 }
 function handlePlaybackTransition(
   previousPlayback: TimedFrame['playback'],
@@ -475,6 +477,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('resize', () => {
   renderer?.resize();
   updateUI();
+  if (state.playback === 'observing') revealCurrentStop(state.now);
   renderer?.render(state, time);
 });
 window.addEventListener('pagehide', (event) => {

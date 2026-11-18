@@ -1,6 +1,6 @@
 # Journey Through Space: quieter interface and coherent flight motion
 
-Status: in-progress
+Status: resolved
 Date: 2026-11-16
 Scope: specification only; implementation and infrastructure changes are subsequent work.
 
