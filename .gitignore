@@ -10,3 +10,9 @@ playwright-report/
 
 # Raw source downloads for scripts/build-textures.mjs (reproducible, not shipped).
 /assets-src/
+
+# Local environment files at the repository root
+/.env
+/.env.*
+!/.env.example
+!/.env.*.example
