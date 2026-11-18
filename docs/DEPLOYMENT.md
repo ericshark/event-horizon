@@ -32,6 +32,12 @@ deployments from `main` continue). `journey-through-space.ericzwierzynski.dev`
 was added with a DNS-only Cloudflare CNAME to the project's Vercel target, and the
 old hostname's record was kept so existing links redirect.
 
-The production deployment was not rebuilt by the rename: until the renamed
-application reaches `main` and is deployed, the new URL serves the last released
-build.
+The renamed application reached `main` on November 17, 2026 (commit `a4b69a7`)
+and Vercel built and deployed that exact commit to production. Verified the same
+day: the new hostname resolves through Cloudflare to the project's Vercel target
+on public resolvers, serves HTTPS 200 with a valid Let's Encrypt certificate and
+the title "Journey Through Space", loads in a browser with no console or network
+errors on desktop and mobile, and the old hostname answers 308 to the new one.
+
+Static assets now include 8K texture maps (about 38 MB), fetched only on the
+high quality tier for the world being observed. No paid resources were added.
