@@ -47,50 +47,61 @@ const quintic = (x: number) => {
   return clamp(t ** 3 * (10 - 15 * t + 6 * t * t));
 };
 /**
- * A shared active-time sample: a smooth exponential acceleration, cruise, and
- * symmetric braking. Its analytic integral is scientific progress; the derivative
- * is the actual virtual speed. Length-aware curvature keeps the first seconds
- * readable even on galactic legs rather than scaling an early mph spike up.
+ * A shared active-time sample: a smooth exponential-plus-quadratic acceleration,
+ * climbing cruise band, and deceleration. Its analytic integral is scientific
+ * progress; the derivative is the actual virtual speed.
  */
 export function schedule(
   elapsed: number,
   duration = LEG_DURATIONS[0],
-  lengthKm = LEG_LENGTHS[0],
+  _lengthKm = LEG_LENGTHS[0],
 ) {
   const t = clamp(elapsed / duration),
     ramp = 0.4,
     cruise = 0.2,
-    k = Math.max(8, Math.log((lengthKm * 3600) / (1.609344 * duration)));
-  // v(x) = x² [k+3 - (k+2)x] exp(k(x-1)); v and v' join
-  // the plateau at 1 and 0, respectively, and start at rest with v'=0.
-  const velocity = (x: number) =>
-    x * x * (k + 3 - (k + 2) * x) * Math.exp(k * (x - 1));
+    k = 6.5,
+    v0 = 0.84,
+    floor = 0.006;
   const a = k + 3,
     b = k + 2;
+  const expVel = (x: number) => x * x * (a - b * x) * Math.exp(k * (x - 1));
   const primitive = (x: number) =>
     (-b / k) * x ** 3 +
     (a / k + (3 * b) / k ** 2) * x ** 2 +
     ((-2 * a) / k ** 2 - (6 * b) / k ** 3) * x +
     (2 * a) / k ** 3 +
     (6 * b) / k ** 4;
-  const integral = (x: number) =>
+  const expInt = (x: number) =>
     Math.max(
       0,
       Math.exp(k * (x - 1)) * primitive(x) - Math.exp(-k) * primitive(0),
     );
-  const rampArea = integral(1),
-    area = 2 * ramp * rampArea + cruise;
+  const polyVel = (x: number) => x * x * (3 - 2 * x);
+  const polyInt = (x: number) => x ** 3 - 0.5 * x ** 4;
+  const unitVel = (x: number) => (1 - floor) * expVel(x) + floor * polyVel(x);
+  const unitInt = (x: number) => (1 - floor) * expInt(x) + floor * polyInt(x);
+  // During cruise [ramp, ramp + cruise], acceleration eases down rather than
+  // halting on a flat plateau: velocity climbs smoothly from v0 to 1.0.
+  const cruiseVel = (u: number) =>
+    v0 + (1 - v0) * (0.2 * u + 0.8 * (3 * u * u - 2 * u ** 3));
+  const cruiseInt = (u: number) =>
+    v0 * u + (1 - v0) * (0.1 * u * u + 0.8 * (u ** 3 - 0.5 * u ** 4));
+  const rampArea = unitInt(1),
+    cruiseArea = cruiseInt(1),
+    area = ramp * v0 * rampArea + cruise * cruiseArea + ramp * rampArea;
   let p: number, v: number;
   if (t < ramp) {
-    p = ramp * integral(t / ramp);
-    v = velocity(t / ramp);
+    const x = t / ramp;
+    p = ramp * v0 * unitInt(x);
+    v = v0 * unitVel(x);
   } else if (t <= ramp + cruise) {
-    p = ramp * rampArea + t - ramp;
-    v = 1;
+    const u = (t - ramp) / cruise;
+    p = ramp * v0 * rampArea + cruise * cruiseInt(u);
+    v = cruiseVel(u);
   } else {
     const x = (1 - t) / ramp;
-    p = area - ramp * integral(x);
-    v = velocity(x);
+    p = area - ramp * unitInt(x);
+    v = unitVel(x);
   }
   const settle = Math.min(1.2, 0.12 * duration),
     departure = 0.15 * duration;

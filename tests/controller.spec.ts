@@ -4,22 +4,33 @@ import { LEG_DURATIONS, LEG_LENGTHS, pointAtDistance } from '../src/journey';
 import { norm, sub, C, AU, LY } from '../src/science';
 import { mph, earthDistance } from '../src/instruments';
 
-test('departure begins immediately and readable speed builds before established travel', () => {
+test('departure begins immediately and virtual speed climbs continuously without stalling', () => {
   for (const leg of [0, 7, 11]) {
     const c = new JourneyController();
     c.observe(leg);
     const initial = c.snapshot().cameraPose.position;
+    const initialEarthKm = c.snapshot().earthKm;
     c.launch(0);
     const first = c.tick(100);
     expect(first.speedKmS).toBeGreaterThan(0);
     expect(norm(sub(first.cameraPose.position, initial))).toBeGreaterThan(
       0.0001,
     );
+    if (leg === 0) {
+      expect(Math.round(c.tick(600).earthKm / 1.609344)).toBeGreaterThan(
+        Math.round(initialEarthKm / 1.609344),
+      );
+    }
     const one = c.tick(1000);
-    expect(mph(one.speedKmS)).toBeLessThan(100);
+    expect(one.speedKmS).toBeGreaterThan(first.speedKmS);
     const two = c.tick(2000);
     expect(two.speedKmS).toBeGreaterThan(one.speedKmS);
-    const peak = c.tick(LEG_DURATIONS[leg] * 0.4 * 1000);
+    const cruiseStart = c.tick(LEG_DURATIONS[leg] * 0.4 * 1000);
+    const cruiseMid = c.tick(LEG_DURATIONS[leg] * 0.5 * 1000);
+    const peak = c.tick(LEG_DURATIONS[leg] * 0.6 * 1000);
+    expect(cruiseStart.thrust).toBeGreaterThan(0.8);
+    expect(cruiseMid.speedKmS).toBeGreaterThan(cruiseStart.speedKmS);
+    expect(peak.speedKmS).toBeGreaterThan(cruiseMid.speedKmS);
     expect(peak.thrust).toBeCloseTo(1);
     expect(norm(sub(peak.cameraPose.position, initial))).toBeGreaterThan(12);
   }

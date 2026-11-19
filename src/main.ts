@@ -115,10 +115,10 @@ $('#au-help-toggle').addEventListener('click', () => {
   $('#au-help-toggle').setAttribute('aria-expanded', String(open));
 });
 let previewIndex = -1;
+const routeStopButtons: HTMLButtonElement[] = [];
 function closePreview(focus = false) {
   $('#route-preview').hidden = true;
-  if (focus && previewIndex >= 0)
-    ($('#route-stops').children[previewIndex] as HTMLElement).focus();
+  if (focus && previewIndex >= 0) routeStopButtons[previewIndex]?.focus();
 }
 function summary(stop: (typeof CHECKPOINTS)[number]) {
   return stop.id === 'earth'
@@ -155,8 +155,19 @@ for (const [i, p] of CHECKPOINTS.entries()) {
       void go(p.id);
     }
   });
+  routeStopButtons.push(b);
   $('#route-stops').append(b);
 }
+const routeProgressFill = document.createElement('span');
+routeProgressFill.id = 'route-progress-fill';
+routeProgressFill.setAttribute('aria-hidden', 'true');
+const routeTraveler = document.createElement('span');
+routeTraveler.id = 'route-traveler';
+routeTraveler.setAttribute('aria-hidden', 'true');
+routeTraveler.dataset.active = 'false';
+routeTraveler.innerHTML =
+  '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M14.5 8 2.5 2.5 5.2 8 2.5 13.5Z"/></svg>';
+$('#route-stops').append(routeProgressFill, routeTraveler);
 $('#route-go').addEventListener('click', () => {
   if (previewIndex >= 0) void go(CHECKPOINTS[previewIndex].id);
   closePreview();
@@ -317,15 +328,12 @@ function updateUI() {
   document.documentElement.classList.toggle('no-webgl', !webgl);
   document.documentElement.style.setProperty('--accent', p.color);
   document.documentElement.style.setProperty('--fallback-color', p.color);
-  for (const el of [
-    $('.masthead'),
-    $('.flight-panel'),
-    $('#rail'),
-    $('#timed-navigation'),
-  ]) {
+  for (const el of [$('.masthead'), $('.flight-panel'), $('#timed-navigation')]) {
     el.hidden = flying;
     el.inert = flying;
   }
+  $('#rail').hidden = complete;
+  $('#rail').inert = complete;
   $('#inspection').hidden = complete;
   $('#inspection').inert = flying || !webgl;
   $('#inspection').setAttribute('aria-disabled', String(flying || !webgl));
@@ -353,7 +361,6 @@ function updateUI() {
   $('#next').dataset.action = atEnd ? 'enter' : 'next';
   $('#next').innerHTML =
     `<span class="nav-direction">${atEnd ? 'Continue' : 'Next'} <svg viewBox="0 0 24 12" aria-hidden="true"><path d="M1 6h21m-5-5 5 5-5 5"/></svg></span><span>${atEnd ? 'Enter the event horizon' : CHECKPOINTS[s.now + 1].name}</span>`;
-  $('#inspection-hint').hidden = !webgl;
   $('#playback-controls').hidden = !flying || complete;
   $('#pause-flight').textContent = s.playback === 'paused' ? 'Resume' : 'Pause';
   $('#skip-flight').textContent = descent ? 'Finish descent' : 'Skip flight';
@@ -387,8 +394,12 @@ function updateUI() {
     performance.now(),
     unitMode === 'miles' ? 'miles per hour' : 'kilometres per hour',
   );
-  $('#speed-needle').style.transform =
-    `rotate(${180 * Math.max(0, Math.min(1, s.thrust))}deg)`;
+  const clampedThrust = Math.max(0, Math.min(1, s.thrust));
+  $('#speed-needle').style.transform = `rotate(${180 * clampedThrust}deg)`;
+  $('#speed-arc').setAttribute(
+    'stroke-dashoffset',
+    String(100 * (1 - clampedThrust)),
+  );
   $('#horizon-radius').textContent =
     s.bhRadius <= 1
       ? 'Inside the horizon'
@@ -398,10 +409,11 @@ function updateUI() {
     `${formatLength(TOTAL, unitMode)} through ${CHECKPOINTS.length} stops; ${PLAYBACK_SECONDS} seconds of forward route playback, plus 20 seconds of optional descent. ${duration(travelTime(TOTAL))} light-equivalent route time.`;
   if (selected !== s.now) {
     selected = s.now;
-    for (const [i, el] of [...$('#route-stops').children].entries())
+    for (const [i, el] of routeStopButtons.entries())
       el.setAttribute('aria-current', i === s.now ? 'step' : 'false');
     if (!flying) revealCurrentStop(s.now);
   }
+  updateRouteTraveler(s);
   if ($<HTMLDialogElement>('#details').open) updateDetails();
   const lost = renderer?.contextLost && !renderer.fallbackPinned;
   $('#context-actions').hidden = !lost;
@@ -415,14 +427,43 @@ function updateUI() {
           ? 'Loading planetary imagery…'
           : '';
 }
+function updateRouteTraveler(s: TimedFrame) {
+  const startBtn = routeStopButtons[s.now],
+    endBtn = routeStopButtons[s.next];
+  if (!startBtn || s.playback === 'complete') return;
+  const startX = startBtn.offsetLeft + startBtn.offsetWidth / 2;
+  const endX = endBtn ? endBtn.offsetLeft + endBtn.offsetWidth / 2 : startX;
+  const active = s.playback !== 'observing' && s.sequence === 'route';
+  if (active) {
+    const x = startX + (endX - startX) * s.legProgress;
+    routeTraveler.dataset.active = 'true';
+    routeTraveler.style.transform = `translateX(${x}px) translate(-50%, -50%) scaleX(${s.direction < 0 ? -1 : 1})`;
+    routeProgressFill.style.left = `${Math.min(startX, x)}px`;
+    routeProgressFill.style.width = `${Math.abs(x - startX)}px`;
+    const scroll = $('#route-scroll');
+    if (
+      scroll.scrollWidth > scroll.clientWidth &&
+      (x < scroll.scrollLeft + 44 ||
+        x > scroll.scrollLeft + scroll.clientWidth - 44)
+    ) {
+      scroll.scrollLeft = Math.max(0, x - scroll.clientWidth / 2);
+    }
+  } else {
+    routeTraveler.dataset.active = 'false';
+    routeTraveler.style.transform = `translateX(${startX}px) translate(-50%, -50%)`;
+    routeProgressFill.style.left = `${startX}px`;
+    routeProgressFill.style.width = '0px';
+  }
+}
 function revealCurrentStop(index: number) {
-  requestAnimationFrame(() =>
-    $('#route-stops').children[index]?.scrollIntoView({
+  requestAnimationFrame(() => {
+    routeStopButtons[index]?.scrollIntoView({
       block: 'nearest',
       inline: 'center',
       behavior: 'instant',
-    }),
-  );
+    });
+    updateRouteTraveler(state);
+  });
 }
 function handlePlaybackTransition(
   previousPlayback: TimedFrame['playback'],
@@ -459,6 +500,8 @@ function frame() {
     updateUI();
     uiAt = now;
     lastPhase = state.phase;
+  } else if (state.playback === 'flying') {
+    updateRouteTraveler(state);
   }
 }
 gsap.ticker.add(frame);

@@ -19,7 +19,12 @@ test('quiet observation and settings remain available throughout a flight', asyn
   ).toBeFocused();
   await page.locator('#next').click();
   await expect(page.locator('#location')).toBeHidden();
-  await expect(page.locator('#rail')).toBeHidden();
+  await expect(page.locator('#rail')).toBeVisible();
+  await expect(page.locator('#route-traveler')).toBeVisible();
+  await expect(page.locator('#route-traveler')).toHaveAttribute(
+    'data-active',
+    'true',
+  );
   await expect(page.locator('#speedometer')).toBeVisible();
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();

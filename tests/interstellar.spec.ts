@@ -50,7 +50,7 @@ test('outer and interstellar flights follow their authored duration and true spe
     const peak = Math.max(...frames.map((f) => f.speedKmS));
     expect(peak).toBeGreaterThan(LEG_LENGTHS[from] / seconds);
     expect(frames[0].speedKmS).toBeGreaterThan(0);
-    expect((frames[0].speedKmS * 3600) / 1.609344).toBeLessThan(100);
+    expect(frames[0].speedKmS).toBeLessThan(peak * 0.01);
     expect(frames.at(-1)!.speedKmS).toBeLessThan(peak * 0.01);
   }
 });

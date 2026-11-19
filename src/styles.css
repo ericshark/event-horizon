@@ -5,6 +5,11 @@
   --muted: #a9bcc8;
   --accent: #91d3e7;
   --mono: 'JetBrains Mono Variable', monospace;
+  --glass-bg: rgba(7, 17, 27, 0.66);
+  --glass-bg-strong: rgba(6, 15, 24, 0.9);
+  --glass-border: rgba(145, 211, 231, 0.2);
+  --glass-border-hover: rgba(145, 211, 231, 0.52);
+  --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.48);
 }
 * {
   box-sizing: border-box;
@@ -117,97 +122,279 @@ summary:focus-visible {
 .masthead {
   position: fixed;
   z-index: 5;
-  top: 24px;
+  top: 22px;
   left: 4vw;
 }
 .brand {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  gap: 10px;
   min-height: 44px;
-  font-size: clamp(17px, 1.6vw, 23px);
-  letter-spacing: -0.035em;
+  padding: 8px 16px 8px 12px;
+  border-radius: 999px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  font-size: clamp(11px, 1.05vw, 13px);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   font-weight: 500;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+.brand-emblem {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  flex-shrink: 0;
+}
+.brand:hover {
+  border-color: var(--glass-border-hover);
+  background: rgba(13, 29, 44, 0.78);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 #settings {
   position: fixed;
-  right: calc(4vw - 10px);
-  top: 24px;
+  right: 4vw;
+  top: 22px;
   z-index: 10;
 }
 #settings-toggle {
   width: 44px;
   height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 12px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
   color: var(--muted);
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+#settings-toggle:hover,
+#settings-toggle[aria-expanded='true'] {
+  color: #fff;
+  border-color: var(--glass-border-hover);
+  background: rgba(13, 29, 44, 0.8);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 #settings-toggle svg {
   width: 20px;
   height: 20px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.35;
+  stroke-width: 1.55;
+  stroke-linecap: round;
+}
+#settings-toggle svg circle {
+  fill: #07121c;
 }
 #preference-controls {
   position: absolute;
-  right: 10px;
+  right: 0;
   top: 52px;
-  width: 260px;
-  padding: 12px 16px;
-  background: #09131c;
-  border: 1px solid #32424f;
-  border-radius: 12px;
-  box-shadow: 0 12px 36px #0008;
+  width: 282px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(145, 211, 231, 0.24);
+  border-radius: 14px;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.68);
 }
 #preference-controls label {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   align-items: center;
-  min-height: 52px;
+  min-height: 48px;
   font-size: 12px;
+  color: var(--muted);
 }
 #preference-controls select {
-  max-width: 136px;
-  background: #09131c;
-  border: 0;
+  appearance: none;
+  width: 136px;
   min-height: 44px;
-  padding: 8px;
+  padding: 8px 32px 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(145, 211, 231, 0.26);
+  background-color: rgba(13, 29, 44, 0.9);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%2391d3e7' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1.5 1.5 6 6l4.5-4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 11px 7px;
+  color: var(--ink);
+  font-size: 12px;
   cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+#preference-controls select:hover {
+  border-color: var(--accent);
+  background-color: rgba(18, 39, 58, 0.95);
+}
+#preference-controls option {
+  background: #081520;
+  color: var(--ink);
+}
+@supports (appearance: base-select) {
+  #preference-controls select,
+  #preference-controls select::picker(select) {
+    appearance: base-select;
+  }
+  #preference-controls select {
+    background-image: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+  }
+  #preference-controls select::picker-icon {
+    color: var(--accent);
+    transition: transform 160ms ease;
+  }
+  #preference-controls select:open::picker-icon {
+    transform: rotate(180deg);
+  }
+  #preference-controls select::picker(select) {
+    margin-top: 6px;
+    padding: 6px;
+    background: #07131e;
+    color: var(--ink);
+    border: 1px solid rgba(145, 211, 231, 0.34);
+    border-radius: 10px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.72);
+  }
+  #preference-controls option {
+    padding: 9px 12px;
+    border-radius: 7px;
+    color: var(--ink);
+    background: transparent;
+    cursor: pointer;
+  }
+  #preference-controls option:hover,
+  #preference-controls option:focus-visible {
+    background: rgba(145, 211, 231, 0.14);
+    color: #fff;
+  }
+  #preference-controls option::checkmark {
+    color: var(--accent);
+  }
 }
 #preference-controls button {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   width: 100%;
   text-align: left;
-  padding: 10px 0;
+  padding: 10px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--ink);
+  transition: background-color 150ms ease;
+}
+#preference-controls button:hover:enabled {
+  background: rgba(145, 211, 231, 0.08);
+}
+.sound-pill {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(82, 103, 121, 0.45);
+  border: 1px solid rgba(145, 211, 231, 0.25);
+  flex-shrink: 0;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+.sound-pill::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease;
+}
+#sound-toggle[data-state='on'] .sound-pill,
+#sound-toggle[data-state='blocked'] .sound-pill {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  border-color: var(--accent);
+}
+#sound-toggle[data-state='on'] .sound-pill::after,
+#sound-toggle[data-state='blocked'] .sound-pill::after {
+  transform: translateX(16px);
+  background: var(--accent);
 }
 #sources-open {
-  border-top: 1px solid #32424f;
-  margin-top: 8px;
+  border-top: 1px solid rgba(145, 211, 231, 0.16);
+  border-radius: 0 0 8px 8px;
+  margin-top: 4px;
+  padding-top: 12px;
+  color: var(--muted);
 }
 .flight-panel {
   position: fixed;
   z-index: 3;
   left: 4vw;
-  top: 23vh;
-  width: min(340px, 36vw);
+  top: clamp(84px, 16vh, 176px);
+  width: min(364px, 37vw);
+  padding: 20px 22px 14px;
+  background: linear-gradient(
+    165deg,
+    rgba(8, 20, 32, 0.64) 0%,
+    rgba(4, 10, 18, 0.44) 100%
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(145, 211, 231, 0.18);
+  border-top: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  border-radius: 16px;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 h1 {
-  font-size: clamp(30px, 3.5vw, 48px);
+  font-size: clamp(28px, 3.3vw, 44px);
   font-weight: 400;
   letter-spacing: -0.035em;
-  line-height: 1.15;
-  margin: 0 0 18px;
+  line-height: 1.12;
+  margin: 0 0 12px;
 }
 #description {
   font-size: 12px;
-  line-height: 1.9;
+  line-height: 1.75;
   color: var(--muted);
   max-width: 39ch;
   margin: 0;
 }
 #observation-facts {
   display: grid;
-  gap: 17px;
-  margin: 28px 0 8px;
+  gap: 13px;
+  margin: 18px 0 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(145, 211, 231, 0.14);
 }
 dt {
   color: var(--muted);
@@ -215,16 +402,32 @@ dt {
 }
 dd {
   overflow-wrap: anywhere;
-  margin: 5px 0 0;
+  margin: 4px 0 0;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 #details-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 88px;
+  padding: 8px 16px;
   font-size: 11px;
-  color: var(--muted);
-  padding-left: 0;
-  text-decoration: underline;
-  text-underline-offset: 5px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: rgba(145, 211, 231, 0.07);
+  border: 1px solid rgba(145, 211, 231, 0.24);
+  border-radius: 9px;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+#details-open:hover:enabled {
+  border-color: var(--accent);
+  background: rgba(145, 211, 231, 0.16);
+  color: #fff;
 }
 #inspection {
   position: fixed;
@@ -244,17 +447,28 @@ dd {
   position: fixed;
   z-index: 4;
   left: 4vw;
-  bottom: 132px;
+  bottom: 116px;
   display: grid;
-  gap: 24px;
+  gap: 14px;
   font-variant-numeric: tabular-nums;
   max-width: 70vw;
+}
+#speedometer,
+#earth-distance,
+#descent-instrument {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.36);
 }
 #timed-instruments > div > span {
   display: block;
   color: var(--muted);
   font-size: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 #timed-instruments strong {
   display: block;
@@ -298,21 +512,42 @@ dd {
   box-shadow: 0 12px 36px #0008;
 }
 #speedometer svg {
-  width: 160px;
+  width: 176px;
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   overflow: visible;
   fill: none;
-  stroke: #6e8292;
-  stroke-width: 1.2;
+}
+.speed-track {
+  stroke: rgba(145, 211, 231, 0.18);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.speed-ticks {
+  stroke: rgba(145, 211, 231, 0.34);
+  stroke-width: 5;
+  stroke-dasharray: 1.5 7.5;
+}
+#speed-arc {
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 65%, transparent));
 }
 #speedometer #speed-needle {
-  stroke: var(--ink);
-  stroke-width: 2;
+  stroke: #fff;
+  stroke-width: 2.2;
+  stroke-linecap: round;
   transform-origin: 90px 85px;
+  filter: drop-shadow(0 0 4px var(--accent));
 }
-#speedometer circle {
-  fill: var(--ink);
+.speed-hub-ring {
+  fill: #07131e;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+.speed-hub {
+  fill: #fff;
   stroke: none;
 }
 #speed-readout {
@@ -344,19 +579,52 @@ dd {
   position: fixed;
   z-index: 4;
   right: 4vw;
-  bottom: 132px;
+  bottom: 116px;
   display: flex;
-  gap: 30px;
-  align-items: flex-start;
+  gap: 14px;
+  align-items: center;
 }
 #timed-navigation button {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 7px;
-  padding: 4px 0;
+  justify-content: center;
+  gap: 6px;
+  min-width: 136px;
   min-height: 58px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   font-size: 12px;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+#previous {
+  align-items: flex-start;
+}
+#next {
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+#timed-navigation button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: rgba(16, 36, 54, 0.82);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.48),
+    0 0 18px color-mix(in srgb, var(--accent) 24%, transparent);
+  transform: translateY(-2px);
+}
+#timed-navigation button:active:not(:disabled) {
+  transform: translateY(0);
+}
+#timed-navigation button:disabled {
+  opacity: 0.35;
 }
 #timed-navigation .nav-direction {
   font-size: 10px;
@@ -370,28 +638,38 @@ dd {
   height: 12px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1;
+  stroke-width: 1.2;
+  transition: transform 160ms ease;
 }
-#inspection-hint {
-  position: absolute;
-  right: 0;
-  top: 65px;
-  white-space: nowrap;
-  font-size: 9px;
-  color: var(--muted);
-  margin: 0;
+#previous:hover:not(:disabled) .nav-direction svg {
+  transform: translateX(-3px);
 }
-.mobile-hint {
-  display: none;
+#next:hover:not(:disabled) .nav-direction svg {
+  transform: translateX(3px);
 }
 #playback-controls {
-  bottom: 42px;
-  gap: 16px;
+  bottom: 112px;
+  gap: 12px;
 }
 #playback-controls button {
   font-size: 12px;
-  border-bottom: 1px solid #526779;
-  padding-inline: 2px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+#playback-controls button:hover:enabled {
+  border-color: var(--accent);
+  background: rgba(16, 36, 54, 0.82);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 #rail {
   position: fixed;
@@ -414,6 +692,40 @@ dd {
   width: max-content;
   min-width: 100%;
   justify-content: space-between;
+}
+#route-progress-fill {
+  position: absolute;
+  top: 9.5px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  pointer-events: none;
+  z-index: 1;
+}
+#route-traveler {
+  position: absolute;
+  top: 10.5px;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  filter: drop-shadow(0 0 6px var(--accent));
+  pointer-events: none;
+  z-index: 2;
+  will-change: transform;
+}
+#route-traveler svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+#route-traveler[data-active='false'] {
+  opacity: 0.72;
 }
 #route-stops button {
   position: relative;
@@ -473,7 +785,7 @@ dd {
   text-underline-offset: 5px;
 }
 .in-flight #timed-instruments {
-  bottom: 110px;
+  bottom: 112px;
 }
 .render-status {
   position: fixed;
@@ -638,14 +950,20 @@ dialog a {
     top: 12px;
   }
   .brand {
-    font-size: 17px;
+    font-size: 11px;
+    padding: 6px 12px 6px 10px;
+    gap: 8px;
+  }
+  .brand-emblem {
+    width: 17px;
+    height: 17px;
   }
   #settings {
-    right: 10px;
+    right: 16px;
     top: 12px;
   }
   #preference-controls {
-    right: 10px;
+    right: 0;
   }
   .vignette {
     background: linear-gradient(
@@ -662,47 +980,58 @@ dialog a {
   .flight-panel {
     left: 20px;
     right: 20px;
-    top: 44svh;
+    top: 37svh;
     width: auto;
+    padding: 14px 16px 12px;
   }
   h1 {
-    font-size: 30px;
-    margin-bottom: 10px;
+    font-size: 28px;
+    margin-bottom: 8px;
+    padding-right: 76px;
   }
   #description {
     font-size: 11px;
-    line-height: 1.7;
+    line-height: 1.65;
     max-width: 45ch;
   }
   #observation-facts {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-    margin: 16px 0 2px;
+    gap: 10px;
+    margin: 12px 0 0;
+    padding-top: 10px;
   }
   dt {
     font-size: 8px;
-    line-height: 1.7;
+    line-height: 1.6;
   }
   dd {
     font-size: 10px;
-    line-height: 1.7;
-    margin-top: 4px;
+    line-height: 1.55;
+    margin-top: 3px;
   }
   #details-open {
     position: absolute;
-    right: 0;
-    top: -5px;
+    right: 10px;
+    top: 10px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px 12px;
     font-size: 10px;
   }
   #inspection {
-    inset: 76px 0 57svh;
+    inset: 76px 0 64svh;
   }
   #timed-instruments {
     left: 20px;
     right: 20px;
-    bottom: 181px;
+    bottom: 174px;
     max-width: none;
-    gap: 24px;
+    gap: 10px;
+  }
+  #speedometer,
+  #earth-distance,
+  #descent-instrument {
+    padding: 10px 12px;
   }
   #timed-instruments strong {
     font-size: 14px;
@@ -726,23 +1055,15 @@ dialog a {
   #timed-navigation {
     left: 20px;
     right: 20px;
-    bottom: 106px;
+    bottom: 102px;
     justify-content: flex-end;
-    gap: 30px;
+    gap: 12px;
   }
   #timed-navigation button {
     font-size: 11px;
+    min-width: 124px;
     min-height: 50px;
-  }
-  #inspection-hint {
-    top: 53px;
-    font-size: 8px;
-  }
-  .desktop-hint {
-    display: none;
-  }
-  .mobile-hint {
-    display: inline;
+    padding: 8px 12px;
   }
   #rail {
     left: 20px;
@@ -762,17 +1083,18 @@ dialog a {
     font-size: 8px;
   }
   .in-flight #timed-instruments {
-    bottom: 145px;
+    bottom: 162px;
   }
   #speed-readout {
     font-size: clamp(10px, 3.05vw, 16px) !important;
   }
   #speedometer svg {
-    width: 140px;
+    width: 144px;
   }
   #playback-controls {
-    bottom: 55px;
+    bottom: 102px;
     right: 20px;
+    gap: 10px;
   }
   .render-status {
     left: 20px;
@@ -797,44 +1119,52 @@ dialog a {
 }
 @media (max-width: 759px) and (max-height: 740px) {
   .flight-panel {
-    top: 40svh;
+    top: 34svh;
+    padding: 12px 14px 10px;
   }
   h1 {
-    font-size: 25px;
+    font-size: 24px;
   }
   #description {
     font-size: 10px;
   }
   #observation-facts {
-    margin-top: 10px;
+    margin-top: 8px;
+    padding-top: 8px;
   }
   #timed-instruments {
     bottom: 168px;
   }
   #timed-navigation {
-    bottom: 101px;
-  }
-  #inspection-hint {
-    display: none;
+    bottom: 100px;
   }
 }
 @media (min-width: 760px) and (max-height: 800px) {
   .flight-panel {
-    top: 17vh;
+    top: 78px;
+    padding: 14px 18px 12px;
   }
   h1 {
-    font-size: 36px;
+    font-size: 32px;
+    margin-bottom: 8px;
+  }
+  #description {
+    line-height: 1.65;
   }
   #observation-facts {
-    gap: 12px;
-    margin-top: 18px;
+    gap: 8px;
+    margin: 12px 0 10px;
+    padding-top: 10px;
   }
 }
 html[data-motion='reduced'] .digit {
   filter: none !important;
 }
 html[data-motion='reduced'] #universe,
-html[data-motion='reduced'] #fallback {
+html[data-motion='reduced'] #fallback,
+html[data-motion='reduced'] button,
+html[data-motion='reduced'] .brand,
+html[data-motion='reduced'] .nav-direction svg {
   transition: none;
 }
 
@@ -862,68 +1192,101 @@ html[data-motion='reduced'] #fallback {
     top: 8px;
   }
   .brand {
-    font-size: 17px;
+    font-size: 11px;
+    padding: 6px 12px 6px 10px;
   }
   #settings {
     top: 8px;
     right: 14px;
   }
+  #preference-controls {
+    top: 48px;
+    padding: 10px 14px;
+    gap: 2px;
+  }
+  #preference-controls label {
+    min-height: 44px;
+  }
   .flight-panel {
-    top: 70px;
+    top: 58px;
     left: 24px;
-    width: min(335px, calc(44vw - 36px));
+    width: min(345px, calc(45vw - 24px));
+    padding: 10px 14px;
   }
   h1 {
-    font-size: 26px;
-    margin-bottom: 8px;
+    font-size: 21px;
+    margin-bottom: 4px;
+    padding-right: 68px;
   }
   #description {
     font-size: 9px;
-    line-height: 1.6;
+    line-height: 1.45;
   }
   #observation-facts {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    margin: 12px 0 0;
+    gap: 8px;
+    margin: 8px 0 0;
+    padding-top: 8px;
   }
   dt {
     font-size: 8px;
-    line-height: 1.5;
+    line-height: 1.4;
   }
   dd {
     font-size: 8.5px;
-    line-height: 1.5;
-    margin-top: 3px;
+    line-height: 1.4;
+    margin-top: 2px;
   }
   #details-open {
     position: absolute;
-    top: -6px;
-    right: 0;
+    top: 4px;
+    right: 6px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 4px 10px;
     font-size: 9px;
   }
   #timed-instruments {
     left: 24px;
-    bottom: 72px;
-    max-width: 44vw;
+    bottom: 78px;
+    max-width: 52vw;
+  }
+  .in-flight #timed-instruments {
+    bottom: 78px;
+    grid-auto-flow: column;
+    align-items: end;
+  }
+  #speedometer,
+  #earth-distance,
+  #descent-instrument {
+    padding: 8px 12px;
   }
   #timed-instruments strong {
     font-size: 14px;
   }
-  #timed-navigation {
+  #timed-navigation,
+  #playback-controls {
     right: 24px;
-    bottom: 90px;
-    gap: 24px;
+    bottom: 78px;
+    gap: 12px;
   }
   #timed-navigation button {
     font-size: 10px;
-    min-height: 44px;
-  }
-  #inspection-hint {
-    display: none;
+    min-width: 112px;
+    min-height: 46px;
+    padding: 6px 12px;
   }
   #rail {
     left: 24px;
     right: 24px;
-    bottom: 8px;
+    bottom: 6px;
+  }
+  #route-stops button {
+    min-height: 44px;
+    padding: 18px 3px 4px;
+  }
+  .route-note {
+    font-size: 8px;
+    margin-top: 2px;
   }
 }

@@ -41,13 +41,13 @@ export function audioTargets(
     master: enabled && visible && frame.playback !== 'paused' ? 1 : 0,
     bed: 0.5 + (reduced ? 0.1 : 0.2) * thrust,
     drive: (reduced ? 0.5 : 1) * thrust ** 1.4,
-    driveHz: 160 + (reduced ? 340 : 760) * thrust,
+    driveHz: 90 + (reduced ? 110 : 220) * thrust,
     arrival: Math.sin(Math.PI * settling) ** 2,
   };
 }
 
-/** Maximum gains, deliberately low: the bed should be felt more than heard. */
-const LEVEL = { master: 0.55, bed: 0.1, drive: 0.16, arrival: 0.07 };
+/** Maximum gains, deliberately low: a subtle spacecraft cabin hum and drive swell. */
+const LEVEL = { master: 0.5, bed: 0.065, drive: 0.14, arrival: 0.045 };
 /** Smoothing time constant (s); every change goes through it, so there are no steps. */
 const TAU = 0.22;
 export type SoundStatus = 'off' | 'on' | 'blocked';
@@ -103,7 +103,7 @@ export class AudioEngine {
     master: 0,
     bed: 0,
     drive: 0,
-    driveHz: 160,
+    driveHz: 90,
     arrival: 0,
   };
   constructor(private supported = typeof AudioContext !== 'undefined') {
@@ -175,55 +175,91 @@ export class AudioEngine {
     drive.connect(master);
     arrival.connect(master);
     const sources: AudioScheduledSourceNode[] = [];
-    // Ambient bed: a quiet detuned fifth under a slowly breathing low-pass.
-    const lowpass = ctx.createBiquadFilter();
-    lowpass.type = 'lowpass';
-    lowpass.frequency.value = 420;
-    lowpass.connect(bed);
-    for (const [freq, type, level] of [
-      [55, 'sine', 1],
-      [82.9, 'sine', 0.6],
-      [110.3, 'triangle', 0.25],
-    ] as [number, OscillatorType, number][]) {
+    // Seamless 4-second warm brown noise via deterministic PRNG + loop crossfade.
+    const length = ctx.sampleRate * 4,
+      fade = Math.min(Math.floor(ctx.sampleRate * 0.15), Math.floor(length / 4)),
+      raw = new Float32Array(length + fade);
+    let seed = 0x13579bdf,
+      last = 0;
+    for (let i = 0; i < raw.length; i++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      const white = (seed / 0xffffffff) * 2 - 1;
+      last = (last + 0.035 * white) / 1.02;
+      raw[i] = Math.max(-1, Math.min(1, last * 2.8));
+    }
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate),
+      data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) data[i] = raw[i];
+    for (let i = 0; i < fade; i++) {
+      const w = i / fade;
+      data[i] = raw[i] * w + raw[length + i] * (1 - w);
+    }
+
+    // Spacecraft cabin / hull resonance: deep sub-bass hum and faint deck airflow.
+    const hullFilter = ctx.createBiquadFilter();
+    hullFilter.type = 'lowpass';
+    hullFilter.frequency.value = 105;
+    hullFilter.Q.value = 0.7;
+    hullFilter.connect(bed);
+    for (const [freq, level] of [
+      [38, 0.75],
+      [76, 0.22],
+    ] as const) {
       const osc = ctx.createOscillator(),
         g = gain(level);
-      osc.type = type;
+      osc.type = 'sine';
       osc.frequency.value = freq;
-      osc.connect(g).connect(lowpass);
+      osc.connect(g).connect(hullFilter);
       osc.start();
       sources.push(osc);
     }
     const lfo = ctx.createOscillator(),
-      depth = gain(90);
-    lfo.frequency.value = 0.06;
-    lfo.connect(depth).connect(lowpass.frequency);
+      depth = gain(16);
+    lfo.frequency.value = 0.07;
+    lfo.connect(depth).connect(hullFilter.frequency);
     lfo.start();
     sources.push(lfo);
-    // Travel: looped brown noise through a band-pass that rises with thrust.
-    const length = ctx.sampleRate * 2,
-      buffer = ctx.createBuffer(1, length, ctx.sampleRate),
-      data = buffer.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < length; i++) {
-      last = (last + 0.02 * ((Math.sin(i * 12.9898) * 43758.5453) % 1)) / 1.02;
-      data[i] = last * 3.5;
-    }
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    noise.loop = true;
+
+    const cabinNoise = ctx.createBufferSource();
+    cabinNoise.buffer = buffer;
+    cabinNoise.loop = true;
+    const cabinAir = ctx.createBiquadFilter();
+    cabinAir.type = 'lowpass';
+    cabinAir.frequency.value = 85;
+    cabinNoise.connect(cabinAir).connect(gain(0.35)).connect(bed);
+    cabinNoise.start();
+    sources.push(cabinNoise);
+
+    // Ion drive: smooth brown noise + subtle low turbine harmonic swept by thrust.
+    const driveNoise = ctx.createBufferSource();
+    driveNoise.buffer = buffer;
+    driveNoise.loop = true;
     const band = ctx.createBiquadFilter();
-    band.type = 'bandpass';
-    band.frequency.value = 160;
-    band.Q.value = 0.7;
-    noise.connect(band).connect(drive);
-    noise.start();
-    sources.push(noise);
-    // Arrival: a soft open chord that blooms and decays while braking settles.
-    for (const freq of [261.63, 392, 523.25]) {
+    band.type = 'lowpass';
+    band.frequency.value = 90;
+    band.Q.value = 0.85;
+    driveNoise.connect(band).connect(drive);
+    driveNoise.start();
+    sources.push(driveNoise);
+
+    const turbine = ctx.createOscillator();
+    turbine.type = 'sine';
+    turbine.frequency.value = 52;
+    turbine.connect(gain(0.25)).connect(band);
+    turbine.start();
+    sources.push(turbine);
+
+    // Arrival: a soft, low-register orbital lock resonance while braking settles.
+    const settleFilter = ctx.createBiquadFilter();
+    settleFilter.type = 'lowpass';
+    settleFilter.frequency.value = 220;
+    settleFilter.connect(arrival);
+    for (const freq of [98, 147]) {
       const osc = ctx.createOscillator(),
-        g = gain(0.5);
+        g = gain(0.45);
+      osc.type = 'sine';
       osc.frequency.value = freq;
-      osc.connect(g).connect(arrival);
+      osc.connect(g).connect(settleFilter);
       osc.start();
       sources.push(osc);
     }

@@ -525,9 +525,7 @@ test('no-WebGL disables and explains unsupported inspection affordances while ke
   await expect(page.locator('#render-status')).toContainText(
     'Static illustration · 3D inspection unavailable',
   );
-  await expect(page.locator('#inspection-hint')).toContainText(
-    'Drag to explore',
-  );
+  await expect(page.locator('#inspection-hint')).toHaveCount(0);
   await expect(page.locator('#inspection')).toHaveAttribute('inert', '');
   await expect(page.getByRole('button', { name: 'Zoom in' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Zoom out' })).toHaveCount(0);
