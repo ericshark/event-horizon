@@ -177,7 +177,10 @@ export class AudioEngine {
     const sources: AudioScheduledSourceNode[] = [];
     // Seamless 4-second warm brown noise via deterministic PRNG + loop crossfade.
     const length = ctx.sampleRate * 4,
-      fade = Math.min(Math.floor(ctx.sampleRate * 0.15), Math.floor(length / 4)),
+      fade = Math.min(
+        Math.floor(ctx.sampleRate * 0.15),
+        Math.floor(length / 4),
+      ),
       raw = new Float32Array(length + fade);
     let seed = 0x13579bdf,
       last = 0;

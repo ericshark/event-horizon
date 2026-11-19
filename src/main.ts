@@ -350,7 +350,11 @@ function updateUI() {
   document.documentElement.classList.toggle('no-webgl', !webgl);
   document.documentElement.style.setProperty('--accent', p.color);
   document.documentElement.style.setProperty('--fallback-color', p.color);
-  for (const el of [$('.masthead'), $('.flight-panel'), $('#timed-navigation')]) {
+  for (const el of [
+    $('.masthead'),
+    $('.flight-panel'),
+    $('#timed-navigation'),
+  ]) {
     el.hidden = flying;
     el.inert = flying;
   }

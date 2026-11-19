@@ -51,9 +51,13 @@ test('route previews anchor above hovered stop, launch animated flight, and mark
     expect(previewBox!.x + previewBox!.width).toBeLessThan(
       page.viewportSize()!.width * 0.6,
     );
-    expect(Math.abs(previewBox!.x + previewBox!.width / 2 - (moonBox!.x + moonBox!.width / 2))).toBeLessThan(
-      140,
-    );
+    expect(
+      Math.abs(
+        previewBox!.x +
+          previewBox!.width / 2 -
+          (moonBox!.x + moonBox!.width / 2),
+      ),
+    ).toBeLessThan(140);
   }
   const target = page.getByRole('button', {
     name: 'Go to Jupiter',
@@ -87,15 +91,18 @@ test('route previews anchor above hovered stop, launch animated flight, and mark
   ).toBeVisible();
   await expect(page.locator('#next')).toBeFocused();
   await expect(target).toHaveAttribute('aria-current', 'step');
-  await expect(
-    page.locator('.route-stop[data-stop="earth"]'),
-  ).toHaveAttribute('data-visited', 'true');
-  await expect(
-    page.locator('.route-stop[data-stop="mars"]'),
-  ).toHaveAttribute('data-visited', 'true');
-  await expect(
-    page.locator('.route-stop[data-stop="saturn"]'),
-  ).toHaveAttribute('data-visited', 'false');
+  await expect(page.locator('.route-stop[data-stop="earth"]')).toHaveAttribute(
+    'data-visited',
+    'true',
+  );
+  await expect(page.locator('.route-stop[data-stop="mars"]')).toHaveAttribute(
+    'data-visited',
+    'true',
+  );
+  await expect(page.locator('.route-stop[data-stop="saturn"]')).toHaveAttribute(
+    'data-visited',
+    'false',
+  );
   await page
     .getByRole('button', { name: 'What is an astronomical unit?', exact: true })
     .click();
