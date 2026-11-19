@@ -37,11 +37,24 @@ test('quiet observation and settings remain available throughout a flight', asyn
   await expect(page.locator('#speedometer')).toBeHidden();
 });
 
-test('route previews do not travel and activation restores visible navigation focus', async ({
+test('route previews anchor above hovered stop, launch animated flight, and mark prior stops visited', async ({
   page,
   isMobile,
 }) => {
   await page.goto('/');
+  const moon = page.getByRole('button', { name: 'Go to Moon', exact: true });
+  if (!isMobile) {
+    await moon.hover();
+    await expect(page.locator('#route-preview')).toBeVisible();
+    const moonBox = await moon.boundingBox();
+    const previewBox = await page.locator('#route-preview').boundingBox();
+    expect(previewBox!.x + previewBox!.width).toBeLessThan(
+      page.viewportSize()!.width * 0.6,
+    );
+    expect(Math.abs(previewBox!.x + previewBox!.width / 2 - (moonBox!.x + moonBox!.width / 2))).toBeLessThan(
+      140,
+    );
+  }
   const target = page.getByRole('button', {
     name: 'Go to Jupiter',
     exact: true,
@@ -53,7 +66,6 @@ test('route previews do not travel and activation restores visible navigation fo
     ).toBeVisible();
     await expect(page.locator('#route-preview')).toContainText('Jupiter');
     await page.getByRole('button', { name: 'Go', exact: true }).click();
-    await expect(page.locator('#next')).toBeFocused();
   } else {
     await target.focus();
     await expect(
@@ -62,11 +74,28 @@ test('route previews do not travel and activation restores visible navigation fo
     await expect(page.locator('#route-preview')).toContainText('Jupiter');
     await target.press('Enter');
   }
+  await expect(page.locator('#route-preview')).toBeHidden();
+  await expect(page.locator('body')).toHaveAttribute('data-playback', 'flying');
+  await expect(page.locator('#speedometer')).toBeVisible();
+  await expect(page.locator('#route-traveler')).toHaveAttribute(
+    'data-active',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Skip flight', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Jupiter', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('#route-preview')).toBeHidden();
+  await expect(page.locator('#next')).toBeFocused();
   await expect(target).toHaveAttribute('aria-current', 'step');
+  await expect(
+    page.locator('.route-stop[data-stop="earth"]'),
+  ).toHaveAttribute('data-visited', 'true');
+  await expect(
+    page.locator('.route-stop[data-stop="mars"]'),
+  ).toHaveAttribute('data-visited', 'true');
+  await expect(
+    page.locator('.route-stop[data-stop="saturn"]'),
+  ).toHaveAttribute('data-visited', 'false');
   await page
     .getByRole('button', { name: 'What is an astronomical unit?', exact: true })
     .click();
@@ -157,7 +186,7 @@ test('dismissing settings on the world does not begin an inspection drag', async
   ).toEqual(original);
 });
 
-test('keyboard activation of the route jumps directly on touch-capable devices too', async ({
+test('keyboard activation of the route launches flight on touch-capable devices too', async ({
   page,
 }) => {
   await page.goto('/');
@@ -167,10 +196,12 @@ test('keyboard activation of the route jumps directly on touch-capable devices t
   });
   await target.focus();
   await target.press('Enter');
+  await expect(page.locator('#route-preview')).toBeHidden();
+  await expect(page.locator('body')).toHaveAttribute('data-playback', 'flying');
+  await page.getByRole('button', { name: 'Skip flight', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Jupiter', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('#route-preview')).toBeHidden();
 });
 
 test('destination content stays separate from instruments across desktop, phone and landscape', async ({

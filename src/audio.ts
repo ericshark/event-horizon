@@ -25,11 +25,11 @@ export function audioTargets(
   frame: Pick<
     TimedFrame,
     'playback' | 'thrust' | 'flightPhase' | 'elapsed' | 'leg'
-  > & { reducedMotion?: boolean },
+  > & { reducedMotion?: boolean; flightDuration?: number },
   enabled: boolean,
   visible = true,
 ): AudioTargets {
-  const duration = LEG_DURATIONS[frame.leg] ?? 6,
+  const duration = frame.flightDuration ?? LEG_DURATIONS[frame.leg] ?? 6,
     settle = SETTLE_SECONDS(duration);
   const settling =
     frame.flightPhase === 'settling'

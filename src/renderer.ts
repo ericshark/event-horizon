@@ -711,7 +711,26 @@ export class JourneyRenderer {
     const warp = warpAt(s.cameraPose ? thrust : 0, reduced);
     const originZ = s.now * SPACING;
     const leg = Math.min(CHECKPOINTS.length - 1, Math.floor(s.position));
-    const resident = residentStops(leg);
+    const resident = [...residentStops(leg)];
+    if (
+      s.playback &&
+      s.playback !== 'observing' &&
+      s.legProgress > 0.35 &&
+      !resident.includes(s.next)
+    ) {
+      if (resident.length >= 4) {
+        let farthest = 0;
+        for (let k = 1; k < resident.length; k++) {
+          if (
+            Math.abs(resident[k] - s.next) >
+            Math.abs(resident[farthest] - s.next)
+          )
+            farthest = k;
+        }
+        resident.splice(farthest, 1);
+      }
+      resident.push(s.next);
+    }
     // Earth first: build the active stop, then adjacent stops (preloading their textures).
     for (const i of [...resident].sort(
       (a, b) => Math.abs(a - s.now) - Math.abs(b - s.now),

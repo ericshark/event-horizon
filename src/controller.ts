@@ -26,6 +26,7 @@ export interface TimedFrame extends FlightState {
   playback: Playback;
   sequence: 'route' | 'descent';
   elapsed: number;
+  flightDuration?: number;
   speedKmS: number;
   /** Normalised speed envelope, 0 at rest and 1 at the cruise plateau. */
   thrust: number;
@@ -125,6 +126,11 @@ export function schedule(
               ? 'cruise'
               : 'braking',
   } as const;
+}
+export function flightDuration(from: number, to: number) {
+  const span = Math.abs(to - from);
+  if (span <= 1) return LEG_DURATIONS[Math.min(from, to)] ?? LEG_DURATIONS[0];
+  return Math.min(30, Math.round(12 + span * 1.5));
 }
 /** Authored illustrative descent: smooth log-radius, not a geodesic. */
 export const DESCENT_SECONDS = 20;
@@ -284,9 +290,37 @@ export class JourneyController {
     if (this.playback !== 'observing') return false;
     const target = this.stop + Math.sign(direction);
     if (!direction || target < 0 || target >= CHECKPOINTS.length) return false;
+    return this.flyTo(now, target);
+  }
+  flyTo(now: number, targetStop: number) {
+    const target = Math.max(
+      0,
+      Math.min(CHECKPOINTS.length - 1, Math.floor(targetStop)),
+    );
+    if (this.playback === 'observing' && target === this.stop) return false;
+    if (
+      this.playback !== 'observing' &&
+      this.sequence === 'route' &&
+      target === this.target
+    ) {
+      if (this.playback === 'paused') this.resume(now);
+      return true;
+    }
+    const current = this.snapshot();
+    if (this.playback !== 'observing') {
+      let anchor = Math.round(current.position);
+      anchor = Math.max(0, Math.min(CHECKPOINTS.length - 1, anchor));
+      if (anchor === target)
+        anchor =
+          target > this.stop
+            ? target - 1
+            : Math.min(CHECKPOINTS.length - 1, target + 1);
+      this.stop = anchor;
+      this.sequence = 'route';
+    }
     this.start = {
-      position: [...this.camera.position],
-      rotation: [...this.camera.rotation],
+      position: [...current.cameraPose.position],
+      rotation: [...current.cameraPose.rotation],
     };
     this.target = target;
     this.end = canonical(this.target);
@@ -340,7 +374,7 @@ export class JourneyController {
       const duration =
         this.sequence === 'descent'
           ? DESCENT_SECONDS
-          : LEG_DURATIONS[Math.min(this.stop, this.target)];
+          : flightDuration(this.stop, this.target);
       this.elapsed = Math.min(duration, this.elapsed + dt);
       if (this.elapsed >= duration - 1e-10) {
         if (this.sequence === 'descent') this.playback = 'complete';
@@ -361,18 +395,41 @@ export class JourneyController {
   }
   private routeSnapshot(forceObservation = false): TimedFrame {
     const observing = forceObservation || this.playback === 'observing',
-      leg = Math.min(this.stop, this.target),
-      timing = schedule(
-        this.elapsed,
-        LEG_DURATIONS[leg] ?? LEG_DURATIONS[0],
-        LEG_LENGTHS[leg],
-      );
+      lo = Math.min(this.stop, this.target),
+      hi = Math.max(this.stop, this.target),
+      span = Math.max(1, hi - lo),
+      leg = lo,
+      duration = flightDuration(this.stop, this.target),
+      spanKm = observing
+        ? LEG_LENGTHS[Math.min(this.stop, LEG_LENGTHS.length - 1)]
+        : CUMULATIVE[hi] - CUMULATIVE[lo],
+      timing = schedule(this.elapsed, duration, spanKm);
     const progress = observing
       ? this.stop
       : this.stop + (this.target - this.stop) * timing.progress;
-    const segment = Math.min(CHECKPOINTS.length - 2, Math.floor(progress)),
-      fraction = progress - segment,
-      scientificPosition = pointAtDistance(segment, fraction);
+    const routeKm = observing
+      ? CUMULATIVE[this.stop]
+      : this.target > this.stop
+        ? CUMULATIVE[this.stop] + spanKm * timing.progress
+        : CUMULATIVE[this.stop] - spanKm * timing.progress;
+    let segment = observing
+      ? Math.min(CHECKPOINTS.length - 2, this.stop)
+      : Math.min(CHECKPOINTS.length - 2, lo);
+    if (!observing) {
+      while (
+        segment < CHECKPOINTS.length - 2 &&
+        routeKm > CUMULATIVE[segment + 1]
+      )
+        segment++;
+    }
+    const fraction = observing
+      ? this.stop === CHECKPOINTS.length - 1
+        ? 1
+        : 0
+      : clamp(
+          (routeKm - CUMULATIVE[segment]) / Math.max(1, LEG_LENGTHS[segment]),
+        );
+    const scientificPosition = pointAtDistance(segment, fraction);
     let cameraPose = this.camera;
     let heading = forwardOf(this.camera);
     let bank = 0;
@@ -432,8 +489,9 @@ export class JourneyController {
                   ? orbit(inbound, b, endCenter, (v - 0.7) / 0.15)
                   : mix(b, this.end.position, (v - 0.85) / 0.15);
         if (v >= 0.3 && v <= 0.7) {
-          const swell = Math.sin((Math.PI * (v - 0.3)) / 0.4) ** 2 * calm;
-          q[1] += arc[0] * swell;
+          const wave = Math.sin((Math.PI * (v - 0.3)) / 0.4);
+          const swell = (span > 1 ? wave : wave * wave) * calm;
+          q[1] += (span > 1 ? Math.max(arc[0], 14) : arc[0]) * swell;
           q[0] += arc[1] * swell;
         }
         return q;
@@ -462,9 +520,7 @@ export class JourneyController {
             )
           : travelFacing.slerp(
               facing(p, endCenter),
-              quintic(
-                (this.elapsed - timing.departure) / (LEG_DURATIONS[leg] * 0.4),
-              ),
+              quintic((this.elapsed - timing.departure) / (duration * 0.4)),
             );
       if (roll)
         rotation = rotation.multiply(
@@ -473,8 +529,7 @@ export class JourneyController {
       bank = roll;
       cameraPose = { position: p, rotation: rotation.toArray() };
     }
-    const speedKmS = observing ? 0 : LEG_LENGTHS[leg] * timing.rate;
-    const routeKm = CUMULATIVE[segment] + LEG_LENGTHS[segment] * fraction;
+    const speedKmS = observing ? 0 : spanKm * timing.rate;
     const frame: TimedFrame = {
       index: this.stop,
       local: fraction,
@@ -501,6 +556,7 @@ export class JourneyController {
       sequence: 'route',
       playback: this.playback,
       elapsed: this.elapsed,
+      flightDuration: duration,
       cameraPose,
       cameraX: cameraPose.position[0],
       cameraZ: cameraPose.position[2],

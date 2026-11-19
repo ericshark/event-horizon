@@ -19,7 +19,6 @@ import {
 import { BASE_FOV, FOV_EXPANSION } from '../src/warp';
 import { buildVoyager, voyagerExtent } from '../src/voyager';
 import {
-  chooseStop,
   openSettings,
   closeSettings,
   brightColor,
@@ -320,8 +319,10 @@ test('audio lifecycle: off by default, explicit toggle, persistence, pause, hidd
   await page.getByRole('button', { name: 'Skip flight' }).click();
   await expect(page.locator('#location')).toHaveText('Voyager 1');
   await expect.poll(async () => (await audio()).targets.drive).toBe(0);
-  // Direct jump while sound is active.
-  await chooseStop(page, 'proxima');
+  // Direct jump via hash while sound is active.
+  await page.evaluate(() => {
+    location.hash = '#proxima';
+  });
   await expect(page.locator('#location')).toHaveText('Proxima Centauri');
   expect((await audio()).targets.drive).toBe(0);
   // Disable: silent, preference stored, context suspended.

@@ -84,22 +84,45 @@
     <section id="timed-instruments" aria-label="Travel instruments">
       <div id="speedometer" hidden>
         <svg
-          viewBox="0 0 180 100"
+          viewBox="0 0 220 124"
           role="img"
           aria-label="Speed relative to this flight’s peak"
         >
-          <path class="speed-track" d="M15 85 A75 75 0 0 1 165 85" />
-          <path class="speed-ticks" d="M24 85 A66 66 0 0 1 156 85" />
+          <defs>
+            <linearGradient
+              id="speed-spectrum"
+              x1="0%"
+              y1="100%"
+              x2="100%"
+              y2="0%"
+            >
+              <stop offset="0%" stop-color="#2ee89a" />
+              <stop offset="30%" stop-color="#8be85b" />
+              <stop offset="55%" stop-color="#f5c842" />
+              <stop offset="78%" stop-color="#ff7a29" />
+              <stop offset="100%" stop-color="#ff334b" />
+            </linearGradient>
+          </defs>
+          <path class="speed-bezel" d="M14 102 A96 96 0 0 1 206 102" />
+          <path
+            class="speed-track-spectrum"
+            d="M24 102 A86 86 0 0 1 196 102"
+          />
+          <path class="speed-ticks" d="M36 102 A74 74 0 0 1 184 102" />
+          <path
+            class="speed-major-ticks"
+            d="M32 102H18 M42.4 63L30.3 56 M71 34.4L64 22.3 M110 24V10 M149 34.4L156 22.3 M177.6 63L189.7 56 M188 102H202"
+          />
           <path
             id="speed-arc"
-            d="M15 85 A75 75 0 0 1 165 85"
+            d="M24 102 A86 86 0 0 1 196 102"
             pathLength="100"
             stroke-dasharray="100"
             stroke-dashoffset="100"
           />
-          <path id="speed-needle" d="M90 85 L22 85" />
-          <circle class="speed-hub-ring" cx="90" cy="85" r="5.5" />
-          <circle class="speed-hub" cx="90" cy="85" r="2.6" /></svg
+          <path id="speed-needle" d="M110 98.5 L26 102 L110 105.5 Z" />
+          <circle class="speed-hub-ring" cx="110" cy="102" r="8.5" />
+          <circle class="speed-hub-core" cx="110" cy="102" r="3.8" /></svg
         ><span id="speed-label">Virtual travel speed</span
         ><strong id="speed-readout"
           ><span id="speed-digits" aria-hidden="true"></span>

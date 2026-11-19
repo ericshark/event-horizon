@@ -204,3 +204,36 @@ test('scientific displacement derivative agrees with speed through acceleration,
     }
   }
 });
+
+test('multi-stop flyTo animates smoothly across stops with monotonic route distance and planet clearance', () => {
+  for (const [from, to] of [
+    [0, 6],
+    [7, 1],
+  ] as const) {
+    const c = new JourneyController();
+    c.observe(from);
+    expect(c.flyTo(0, to)).toBe(true);
+    const dir = Math.sign(to - from);
+    const duration = c.snapshot().flightDuration!;
+    let prevRoute = c.snapshot().routeKm;
+    let minClearance = Infinity;
+    for (let t = 0.25; t < duration; t += 0.25) {
+      const s = c.tick(t * 1000);
+      expect((s.routeKm - prevRoute) * dir).toBeGreaterThanOrEqual(-1e-6);
+      expect(s.speedKmS).toBeGreaterThan(0);
+      prevRoute = s.routeKm;
+      const p = s.cameraPose.position;
+      for (let stop = Math.min(from, to); stop <= Math.max(from, to); stop++) {
+        minClearance = Math.min(
+          minClearance,
+          Math.hypot(p[0], p[1], p[2] - stop * 120),
+        );
+      }
+    }
+    const end = c.tick(duration * 1000);
+    expect(end.playback).toBe('observing');
+    expect(end.now).toBe(to);
+    expect(end.speedKmS).toBe(0);
+    expect(minClearance).toBeGreaterThan(2.5);
+  }
+});

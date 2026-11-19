@@ -511,68 +511,81 @@ dd {
   line-height: 1.8;
   box-shadow: 0 12px 36px #0008;
 }
+#speedometer {
+  --speed-color: #2ee89a;
+  background:
+    radial-gradient(
+      circle at 50% 34%,
+      color-mix(in srgb, var(--speed-color) 16%, transparent),
+      transparent 70%
+    ),
+    var(--glass-bg);
+  border-top: 2px solid color-mix(in srgb, var(--speed-color) 75%, transparent);
+}
 #speedometer svg {
-  width: 176px;
+  width: 206px;
   display: block;
-  margin-bottom: 8px;
+  margin: 0 auto 8px;
   overflow: visible;
   fill: none;
 }
-.speed-track {
-  stroke: rgba(145, 211, 231, 0.18);
-  stroke-width: 4;
+.speed-bezel {
+  stroke: rgba(145, 211, 231, 0.22);
+  stroke-width: 1.25;
+}
+.speed-track-spectrum {
+  stroke: url(#speed-spectrum);
+  stroke-width: 6.5;
   stroke-linecap: round;
+  opacity: 0.18;
 }
 .speed-ticks {
-  stroke: rgba(145, 211, 231, 0.34);
-  stroke-width: 5;
-  stroke-dasharray: 1.5 7.5;
+  stroke: rgba(145, 211, 231, 0.3);
+  stroke-width: 4;
+  stroke-dasharray: 1.5 6.8;
+}
+.speed-major-ticks {
+  stroke: rgba(229, 237, 241, 0.55);
+  stroke-width: 1.5;
+  stroke-linecap: round;
 }
 #speed-arc {
-  stroke: var(--accent);
-  stroke-width: 4;
+  stroke: url(#speed-spectrum);
+  stroke-width: 6.5;
   stroke-linecap: round;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 65%, transparent));
+  filter: drop-shadow(
+    0 0 7px color-mix(in srgb, var(--speed-color) 70%, transparent)
+  );
 }
 #speedometer #speed-needle {
-  stroke: #fff;
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  transform-origin: 90px 85px;
-  filter: drop-shadow(0 0 4px var(--accent));
+  fill: #fff;
+  stroke: var(--speed-color);
+  stroke-width: 0.9;
+  transform-origin: 110px 102px;
+  filter: drop-shadow(0 0 6px var(--speed-color));
 }
 .speed-hub-ring {
   fill: #07131e;
-  stroke: var(--accent);
-  stroke-width: 1.6;
+  stroke: var(--speed-color);
+  stroke-width: 2;
 }
-.speed-hub {
-  fill: #fff;
+.speed-hub-core {
+  fill: var(--speed-color);
   stroke: none;
+  filter: drop-shadow(0 0 5px var(--speed-color));
 }
 #speed-readout {
-  font-size: clamp(12px, 1.6vw, 23px) !important;
+  font-size: clamp(12px, 1.55vw, 22px) !important;
+  font-variant-numeric: tabular-nums;
 }
 #speed-digits {
-  display: inline-flex;
-}
-.digit,
-.separator {
-  height: 1.3em;
   display: inline-block;
-  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
 }
-.digit {
-  width: 1ch;
-}
-.digit > span {
-  display: flex;
-  flex-direction: column;
-}
-.digit i {
-  height: 1.3em;
-  font-style: normal;
-  line-height: 1.3;
+#speed-unit {
+  color: var(--speed-color) !important;
+  font-weight: 500;
 }
 #timed-navigation,
 #playback-controls {
@@ -702,7 +715,7 @@ dd {
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
 #route-traveler {
   position: absolute;
@@ -725,10 +738,11 @@ dd {
   fill: currentColor;
 }
 #route-traveler[data-active='false'] {
-  opacity: 0.72;
+  opacity: 0.9;
 }
 #route-stops button {
   position: relative;
+  z-index: 1;
   white-space: nowrap;
   font-size: 10px;
   color: var(--muted);
@@ -751,6 +765,14 @@ dd {
   border-radius: 50%;
   transform: translateX(-50%);
 }
+#route-stops button[data-visited='true'] {
+  color: color-mix(in srgb, var(--ink) 80%, var(--muted));
+}
+#route-stops button[data-visited='true']:after {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 65%, transparent);
+}
 #route-stops button[aria-current='step'] {
   color: var(--ink);
 }
@@ -765,14 +787,29 @@ dd {
 }
 #route-preview {
   position: absolute;
-  bottom: 92px;
-  right: 0;
-  width: min(360px, 100%);
-  background: #09131c;
-  border: 1px solid #32424f;
+  bottom: 82px;
+  left: 0;
+  width: min(340px, 100%);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(145, 211, 231, 0.28);
   border-radius: 12px;
   padding: 12px 16px;
-  box-shadow: 0 12px 36px #0008;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.62);
+  z-index: 6;
+}
+#route-preview::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: var(--preview-arrow-x, 50%);
+  width: 10px;
+  height: 10px;
+  background: #07131e;
+  border-right: 1px solid rgba(145, 211, 231, 0.28);
+  border-bottom: 1px solid rgba(145, 211, 231, 0.28);
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 #route-preview p {
   font-size: 12px;
@@ -1077,7 +1114,7 @@ dialog a {
     font-size: 10px;
   }
   #route-preview {
-    bottom: 87px;
+    bottom: 82px;
   }
   .route-note {
     font-size: 8px;
@@ -1089,7 +1126,7 @@ dialog a {
     font-size: clamp(10px, 3.05vw, 16px) !important;
   }
   #speedometer svg {
-    width: 144px;
+    width: 164px;
   }
   #playback-controls {
     bottom: 102px;

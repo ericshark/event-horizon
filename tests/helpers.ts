@@ -89,11 +89,13 @@ export async function closeSettings(page: Page) {
     await trigger.click();
 }
 
-/** Touch previews first; desktop activation navigates immediately. */
+/** Touch previews first; desktop activation launches flight, then skips for test setup. */
 export async function chooseStop(page: Page, id: string) {
   const stop = page.locator(`.route-stop[data-stop="${id}"]`);
   await stop.scrollIntoViewIfNeeded();
   await stop.click();
   const go = page.locator('#route-go');
   if (await go.isVisible()) await go.click();
+  const skip = page.locator('#skip-flight');
+  if (await skip.isVisible()) await skip.click();
 }

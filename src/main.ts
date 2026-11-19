@@ -126,11 +126,28 @@ function summary(stop: (typeof CHECKPOINTS)[number]) {
     : (stop.description.match(/.*?[.!?](?:\s|$)/)?.[0].trim() ??
         stop.description);
 }
+function positionPreview(i: number) {
+  const popup = $('#route-preview');
+  const btn = routeStopButtons[i];
+  if (popup.hidden || !btn) return;
+  const railRect = $('#rail').getBoundingClientRect();
+  const btnRect = btn.getBoundingClientRect();
+  const anchorX = btnRect.left + btnRect.width / 2 - railRect.left;
+  const popupWidth = popup.offsetWidth || Math.min(360, railRect.width);
+  const left = Math.max(
+    0,
+    Math.min(railRect.width - popupWidth, anchorX - popupWidth / 2),
+  );
+  popup.style.left = `${left}px`;
+  const arrowX = Math.max(18, Math.min(popupWidth - 18, anchorX - left));
+  popup.style.setProperty('--preview-arrow-x', `${arrowX}px`);
+}
 function preview(i: number) {
   previewIndex = i;
   $('#route-preview-text').textContent =
     `${CHECKPOINTS[i].name} — ${summary(CHECKPOINTS[i])}`;
   $('#route-preview').hidden = false;
+  positionPreview(i);
 }
 const touchRoute = () => matchMedia('(hover: none)').matches;
 for (const [i, p] of CHECKPOINTS.entries()) {
@@ -152,7 +169,7 @@ for (const [i, p] of CHECKPOINTS.entries()) {
     if (touchRoute() && event.detail !== 0) preview(i);
     else {
       closePreview();
-      void go(p.id);
+      flyToStop(i);
     }
   });
   routeStopButtons.push(b);
@@ -168,9 +185,14 @@ routeTraveler.dataset.active = 'false';
 routeTraveler.innerHTML =
   '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M14.5 8 2.5 2.5 5.2 8 2.5 13.5Z"/></svg>';
 $('#route-stops').append(routeProgressFill, routeTraveler);
+$('#route-scroll').addEventListener('scroll', () => {
+  if (previewIndex >= 0 && !$('#route-preview').hidden)
+    positionPreview(previewIndex);
+});
 $('#route-go').addEventListener('click', () => {
-  if (previewIndex >= 0) void go(CHECKPOINTS[previewIndex].id);
+  const target = previewIndex;
   closePreview();
+  if (target >= 0) flyToStop(target);
 });
 $('#rail').addEventListener('pointerleave', () => {
   if (!touchRoute() && !$('#rail').contains(document.activeElement))
@@ -395,6 +417,10 @@ function updateUI() {
     unitMode === 'miles' ? 'miles per hour' : 'kilometres per hour',
   );
   const clampedThrust = Math.max(0, Math.min(1, s.thrust));
+  $('#speedometer').style.setProperty(
+    '--speed-color',
+    speedColor(clampedThrust),
+  );
   $('#speed-needle').style.transform = `rotate(${180 * clampedThrust}deg)`;
   $('#speed-arc').setAttribute(
     'stroke-dashoffset',
@@ -427,32 +453,56 @@ function updateUI() {
           ? 'Loading planetary imagery…'
           : '';
 }
+function speedColor(thrust: number) {
+  const stops: [number, [number, number, number]][] = [
+    [0, [46, 232, 154]],
+    [0.42, [245, 200, 66]],
+    [0.74, [255, 122, 41]],
+    [1, [255, 51, 75]],
+  ];
+  const t = Math.max(0, Math.min(1, thrust));
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [t0, c0] = stops[i],
+      [t1, c1] = stops[i + 1];
+    if (t <= t1) {
+      const f = (t - t0) / Math.max(1e-6, t1 - t0);
+      const rgb = c0.map((v, j) => Math.round(v + (c1[j] - v) * f));
+      return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+    }
+  }
+  return 'rgb(255, 51, 75)';
+}
+function stopCenter(index: number) {
+  const btn = routeStopButtons[index];
+  return btn ? btn.offsetLeft + btn.offsetWidth / 2 : 0;
+}
 function updateRouteTraveler(s: TimedFrame) {
-  const startBtn = routeStopButtons[s.now],
-    endBtn = routeStopButtons[s.next];
+  const startBtn = routeStopButtons[s.now];
   if (!startBtn || s.playback === 'complete') return;
-  const startX = startBtn.offsetLeft + startBtn.offsetWidth / 2;
-  const endX = endBtn ? endBtn.offsetLeft + endBtn.offsetWidth / 2 : startX;
+  const earthX = stopCenter(0);
+  const startX = stopCenter(s.now);
+  const endX = routeStopButtons[s.next] ? stopCenter(s.next) : startX;
   const active = s.playback !== 'observing' && s.sequence === 'route';
+  const currentX = active ? startX + (endX - startX) * s.legProgress : startX;
+  routeProgressFill.style.left = `${earthX}px`;
+  routeProgressFill.style.width = `${Math.max(0, currentX - earthX)}px`;
+  for (let i = 0; i < routeStopButtons.length; i++) {
+    routeStopButtons[i].dataset.visited = String(stopCenter(i) < currentX - 1);
+  }
   if (active) {
-    const x = startX + (endX - startX) * s.legProgress;
     routeTraveler.dataset.active = 'true';
-    routeTraveler.style.transform = `translateX(${x}px) translate(-50%, -50%) scaleX(${s.direction < 0 ? -1 : 1})`;
-    routeProgressFill.style.left = `${Math.min(startX, x)}px`;
-    routeProgressFill.style.width = `${Math.abs(x - startX)}px`;
+    routeTraveler.style.transform = `translateX(${currentX}px) translate(-50%, -50%) scaleX(${s.direction < 0 ? -1 : 1})`;
     const scroll = $('#route-scroll');
     if (
       scroll.scrollWidth > scroll.clientWidth &&
-      (x < scroll.scrollLeft + 44 ||
-        x > scroll.scrollLeft + scroll.clientWidth - 44)
+      (currentX < scroll.scrollLeft + 44 ||
+        currentX > scroll.scrollLeft + scroll.clientWidth - 44)
     ) {
-      scroll.scrollLeft = Math.max(0, x - scroll.clientWidth / 2);
+      scroll.scrollLeft = Math.max(0, currentX - scroll.clientWidth / 2);
     }
   } else {
     routeTraveler.dataset.active = 'false';
-    routeTraveler.style.transform = `translateX(${startX}px) translate(-50%, -50%)`;
-    routeProgressFill.style.left = `${startX}px`;
-    routeProgressFill.style.width = '0px';
+    routeTraveler.style.transform = `translateX(${currentX}px) translate(-50%, -50%)`;
   }
 }
 function revealCurrentStop(index: number) {
@@ -496,7 +546,13 @@ function frame() {
   handlePlaybackTransition(previousPlayback, state.playback);
   renderer?.render(state, time);
   audio.update(state as TimedFrame);
-  if (state.now !== selected || state.phase !== lastPhase || now - uiAt >= 70) {
+  const uiInterval =
+    state.playback === 'flying' && !state.reducedMotion ? 33 : 70;
+  if (
+    state.now !== selected ||
+    state.phase !== lastPhase ||
+    now - uiAt >= uiInterval
+  ) {
     updateUI();
     uiAt = now;
     lastPhase = state.phase;
@@ -521,6 +577,8 @@ window.addEventListener('resize', () => {
   renderer?.resize();
   updateUI();
   if (state.playback === 'observing') revealCurrentStop(state.now);
+  if (previewIndex >= 0 && !$('#route-preview').hidden)
+    positionPreview(previewIndex);
   renderer?.render(state, time);
 });
 window.addEventListener('pagehide', (event) => {
@@ -644,6 +702,23 @@ soundToggle.addEventListener('click', () => {
 });
 updateSound();
 
+function flyToStop(index: number) {
+  if (
+    document.body.classList.contains('direct-navigation') ||
+    document.querySelector('dialog[open]')
+  )
+    return;
+  clearInspection();
+  closePreview();
+  if (controller.flyTo(performance.now(), index)) {
+    wheel.reset();
+    state = controller.snapshot();
+    updateUI();
+    $('#pause-flight').focus();
+    $('#journey-announcement').textContent =
+      `Flying to ${CHECKPOINTS[state.next].name}.`;
+  }
+}
 function launch(direction: number) {
   if (
     document.body.classList.contains('direct-navigation') ||
